@@ -1,0 +1,30 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>edu.gmu.ulman</groupId>
+    <artifactId>cs706-project</artifactId>
+    <version>CURRENT</version>
+
+    <dependencies>
+    <dependency>
+        <groupId>com.metsci.glimpse</groupId>
+        <artifactId>glimpse-core</artifactId>
+        <version>1.2.0</version>
+    </dependency>
+    </dependencies>
+<repositories>
+    <repository>
+        <id>glimpse-releases</id>
+        <url>http://glimpse.metsci.com/maven2/metsci-releases</url>
+    </repository>
+    <repository>
+        <id>glimpse-snapshots</id>
+        <url>http://glimpse.metsci.com/maven2/metsci-snapshots</url>
+    </repository>
+    <repository>
+        <id>glimpse-thirdparty</id>
+        <url>http://glimpse.metsci.com/maven2/thirdparty</url>
+    </repository>
+</repositories>
+</project>
+
