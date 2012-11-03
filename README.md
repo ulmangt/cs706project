@@ -14,5 +14,7 @@ JCUDA interfaces with native CUDA libraries and must also be built from source f
 
 * Download JCUDA source from: http://www.jcuda.org/downloads/JCuda-All-0.5.0RC-src.zip
 * export JAVA_HOME=/usr/lib/jvm/jdk1.6.0_32
+* export PATH=$PATH:/usr/local/cuda-5.0/bin
 * cmake -G "Unix Makefiles" CmakeLists.txt
+* make
 
