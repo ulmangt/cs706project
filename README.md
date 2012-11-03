@@ -12,6 +12,7 @@ CUDA also requires that the NVIDIA CUDA SDK, development kit, and developer driv
 
 JCUDA interfaces with native CUDA libraries and must also be built from source for your system. On Ubuntu 12.04, the build process was as follows:
 
-Download JCUDA source from: http://www.jcuda.org/downloads/JCuda-All-0.5.0RC-src.zip
-cmake -G "Unix Makefiles" CmakeLists.txt
+* Download JCUDA source from: http://www.jcuda.org/downloads/JCuda-All-0.5.0RC-src.zip
+* export JAVA_HOME=/usr/lib/jvm/jdk1.6.0_32
+* cmake -G "Unix Makefiles" CmakeLists.txt
 
