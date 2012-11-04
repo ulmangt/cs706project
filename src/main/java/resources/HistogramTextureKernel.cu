@@ -3,8 +3,8 @@
 texture<float,  2, cudaReadModeElementType> texture_float_2D;
 
 extern "C"
-__global__ void test_float_2D(float *output, float posX, float posY)
+__global__ void test_float_2D(int *bins, float posX, float posY)
 {
     float result = tex2D(texture_float_2D, posX, posY);
-    output[0] = result;
+    bins[0] = (int) result;
 }

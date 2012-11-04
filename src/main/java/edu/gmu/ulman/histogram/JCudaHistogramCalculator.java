@@ -1,5 +1,8 @@
 package edu.gmu.ulman.histogram;
 
+import static jcuda.driver.CUaddress_mode.*;
+import static jcuda.driver.CUarray_format.*;
+import static jcuda.driver.CUfilter_mode.*;
 import static jcuda.driver.JCudaDriver.*;
 
 import java.io.IOException;
@@ -102,12 +105,21 @@ public class JCudaHistogramCalculator
         // create a texture reference and bind it to the global variable "texture_float_2D" in the CUDA source code
         textureReference = new CUtexref( );
         cuModuleGetTexRef( textureReference, module, "texture_float_2D" );
+        
+        // set how to interpolate between texture values (linear interpolation)
+        // and what to do for texture coordinates outside of texture bounds (clamp)
+        cuTexRefSetFilterMode( textureReference, CU_TR_FILTER_MODE_LINEAR );
+        cuTexRefSetAddressMode( textureReference, 0, CU_TR_ADDRESS_MODE_CLAMP );
+        cuTexRefSetAddressMode( textureReference, 1, CU_TR_ADDRESS_MODE_CLAMP );
+        
+        cuTexRefSetFlags( textureReference, CU_TRSF_NORMALIZED_COORDINATES );
+        cuTexRefSetFormat( textureReference, CU_AD_FORMAT_FLOAT, 1 );
 
         // bind the cudaTextureReference to the cudaArray
         cuTexRefSetArray( textureReference, hostArray, CU_TRSA_OVERRIDE_FORMAT );
 
         // unbind cuGraphicsResource so that it can be accessed by OpenGL again
-        cuGraphicsUnmapResources( 1, new CUgraphicsResource[] { gfxResource }, null );
+        //cuGraphicsUnmapResources( 1, new CUgraphicsResource[] { gfxResource }, null );
 
         
         // obtain the test function
@@ -116,40 +128,52 @@ public class JCudaHistogramCalculator
         cuFuncSetBlockShape( functionTest, 1, 1, 1 );
         
         // allocate host memory for histogram bins
-        float[] histogramBins = new float[numBins];
+        hHistogramBins = new int[numBins];
 
         // allocate device pointer with space for all bin values
         dHistogramBins = new CUdeviceptr( );
         cuMemAlloc( dHistogramBins, numBins * Sizeof.INT );
 
         // zero out device memory array
-        cuMemsetD32( dHistogramBins, 0, numBins * Sizeof.INT );
+        cuMemsetD32( dHistogramBins, 0, numBins );
     }
     
     public void calculateHistogram( )
     {
+        // map the cuGraphicsResource, which makes it accessible to CUDA
+        // (OpenGL should not access the texture until we unmap)
+        //cuGraphicsMapResources( 1, new CUgraphicsResource[] { gfxResource }, null );
+        
         // set up the function parameters 
         Pointer pHistogramBins = Pointer.to( dHistogramBins );
-        Pointer pPosX = Pointer.to( new float[] { 0.0f } );
-        Pointer pPosY = Pointer.to( new float[] { 0.0f } );
+        Pointer pPosX = Pointer.to( new float[] { 0.5f } );
+        Pointer pPosY = Pointer.to( new float[] { 0.5f } );
+        
         int offset = 0;
+        
         offset = align( offset, Sizeof.POINTER );
         cuParamSetv( functionTest, offset, pHistogramBins, Sizeof.POINTER );
         offset += Sizeof.POINTER;
+        
         offset = align( offset, Sizeof.FLOAT );
         cuParamSetv( functionTest, offset, pPosX, Sizeof.FLOAT );
         offset += Sizeof.FLOAT;
+        
         offset = align( offset, Sizeof.FLOAT );
         cuParamSetv( functionTest, offset, pPosY, Sizeof.FLOAT );
         offset += Sizeof.FLOAT;
+        
         cuParamSetSize( functionTest, offset );
         
         // call the function.
         cuLaunch( functionTest );
         cuCtxSynchronize( );
         
+        // unbind cuGraphicsResource so that it can be accessed by OpenGL again
+        //cuGraphicsUnmapResources( 1, new CUgraphicsResource[] { gfxResource }, null );
+        
         // copy the kernel output back to the host
-        cuMemcpyDtoH( Pointer.to( hHistogramBins ), dHistogramBins, Sizeof.FLOAT * numBins );
+        cuMemcpyDtoH( Pointer.to( hHistogramBins ), dHistogramBins, Sizeof.INT * numBins );
         
         System.out.println( "Kernel Output: ");
         for ( int i = 0 ; i < numBins ; i++ )

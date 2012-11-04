@@ -56,7 +56,7 @@ public class HistogramPainter extends GlimpseDataPainter2D
 
         if ( calculator != null )
         {
-            //TODO do work here
+            calculator.calculateHistogram( );
         }
     }
 

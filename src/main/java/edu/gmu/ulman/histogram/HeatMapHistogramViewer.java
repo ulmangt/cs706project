@@ -72,8 +72,8 @@ public class HeatMapHistogramViewer implements GlimpseLayoutProvider
         // add some named tags at specific points along the axis
         // also add a custom "attribute" to each tag which specifies the relative (0 to 1)
         // point along the color scale which the tag is attached to
-        final Tag t1 = axisZ.addTag( "T1", -2.0 ).setAttribute( TEX_COORD_ATTR, 0.0f );
-        final Tag t5 = axisZ.addTag( "T5", 2.0 ).setAttribute( TEX_COORD_ATTR, 1.0f );
+        final Tag t1 = axisZ.addTag( "T1", -200.0 ).setAttribute( TEX_COORD_ATTR, 0.0f );
+        final Tag t5 = axisZ.addTag( "T5", 200.0 ).setAttribute( TEX_COORD_ATTR, 1.0f );
 
         // add a constraint which prevents dragging the tags past one another
         axisZ.addConstraint( new NamedConstraint( "C1" )
@@ -100,8 +100,8 @@ public class HeatMapHistogramViewer implements GlimpseLayoutProvider
         plot.setMinY( 0.0f );
         plot.setMaxY( 1.0f );
 
-        plot.setMinZ( -3.0f );
-        plot.setMaxZ( 3.0f );
+        plot.setMinZ( -300.0f );
+        plot.setMaxZ( 300.0f );
 
         // lock the aspect ratio of the x and y axis to 1 to 1
         plot.lockAspectRatioXY( 1.0f );
@@ -173,7 +173,7 @@ public class HeatMapHistogramViewer implements GlimpseLayoutProvider
                 double x = w / ( double ) width;
                 double y = h / ( double ) height;
 
-                data[w][h] = y * y + Math.sin( 2 * Math.PI * x * x ) + Math.random( );
+                data[w][h] = ( y * y + Math.sin( 2 * Math.PI * x * x ) + Math.random( ) ) * 100;
             }
         }
 
