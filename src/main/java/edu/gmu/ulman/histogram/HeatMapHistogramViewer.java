@@ -28,7 +28,7 @@
  */
 package edu.gmu.ulman.histogram;
 
-import static com.metsci.glimpse.axis.tagged.Tag.TEX_COORD_ATTR;
+import static com.metsci.glimpse.axis.tagged.Tag.*;
 
 import com.metsci.glimpse.axis.tagged.NamedConstraint;
 import com.metsci.glimpse.axis.tagged.Tag;
@@ -43,7 +43,6 @@ import com.metsci.glimpse.plot.TaggedColorAxisPlot2D;
 import com.metsci.glimpse.support.colormap.ColorGradients;
 import com.metsci.glimpse.support.projection.FlatProjection;
 import com.metsci.glimpse.support.projection.Projection;
-import com.metsci.glimpse.support.texture.FloatTextureProjected2D;
 
 /**
  * A 2D heatmap visualization which uses OpenGL Shader Language to apply a dynamic
@@ -117,7 +116,7 @@ public class HeatMapHistogramViewer implements GlimpseLayoutProvider
         Projection projection = new FlatProjection( 0, 1, 0, 1 );
 
         // create an OpenGL texture wrapper object
-        FloatTextureProjected2D texture = new FloatTextureProjected2D( 1000, 1000 );
+        AccessibleFloatTexture2D texture = new AccessibleFloatTexture2D( 1000, 1000 );
 
         // load the data and projection into the texture
         texture.setProjection( projection );
@@ -154,6 +153,9 @@ public class HeatMapHistogramViewer implements GlimpseLayoutProvider
         // tell the cursor painter what texture to report data values from
         cursorPainter.setTexture( texture );
 
+        //XXX temporary test code
+        plot.addPainter( new HistogramPainter( texture ) );
+        
         return plot;
     }
 
