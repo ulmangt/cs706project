@@ -1,0 +1,234 @@
+	.version 1.4
+	.target sm_10, map_f64_to_f32
+	// compiled with /usr/local/cuda-5.0/open64/lib//be
+	// nvopencc 4.1 built on 2012-09-21
+
+	//-----------------------------------------------------------
+	// Compiling /tmp/tmpxft_00000b6a_00000000-9_JCudaDriverTextureTestKernels.cpp3.i (/tmp/ccBI#.EBWEGv)
+	//-----------------------------------------------------------
+
+	//-----------------------------------------------------------
+	// Options:
+	//-----------------------------------------------------------
+	//  Target:ptx, ISA:sm_10, Endian:little, Pointer Size:64
+	//  -O3	(Optimization level)
+	//  -g0	(Debug level)
+	//  -m2	(Report advisories)
+	//-----------------------------------------------------------
+
+	.file	1	"<command-line>"
+	.file	2	"/tmp/tmpxft_00000b6a_00000000-8_JCudaDriverTextureTestKernels.cudafe2.gpu"
+	.file	3	"/usr/lib/gcc/x86_64-linux-gnu/4.6/include/stddef.h"
+	.file	4	"/usr/local/cuda-5.0/bin/../include/crt/device_runtime.h"
+	.file	5	"/usr/local/cuda-5.0/bin/../include/host_defines.h"
+	.file	6	"/usr/local/cuda-5.0/bin/../include/builtin_types.h"
+	.file	7	"/usr/local/cuda-5.0/bin/../include/device_types.h"
+	.file	8	"/usr/local/cuda-5.0/bin/../include/driver_types.h"
+	.file	9	"/usr/local/cuda-5.0/bin/../include/surface_types.h"
+	.file	10	"/usr/local/cuda-5.0/bin/../include/texture_types.h"
+	.file	11	"/usr/local/cuda-5.0/bin/../include/vector_types.h"
+	.file	12	"/usr/local/cuda-5.0/bin/../include/device_launch_parameters.h"
+	.file	13	"/usr/local/cuda-5.0/bin/../include/crt/storage_class.h"
+	.file	14	"src/main/java/resources/JCudaDriverTextureTestKernels.cu"
+	.file	15	"/usr/local/cuda-5.0/bin/../include/common_functions.h"
+	.file	16	"/usr/local/cuda-5.0/bin/../include/math_functions.h"
+	.file	17	"/usr/local/cuda-5.0/bin/../include/math_constants.h"
+	.file	18	"/usr/local/cuda-5.0/bin/../include/device_functions.h"
+	.file	19	"/usr/local/cuda-5.0/bin/../include/sm_11_atomic_functions.h"
+	.file	20	"/usr/local/cuda-5.0/bin/../include/sm_12_atomic_functions.h"
+	.file	21	"/usr/local/cuda-5.0/bin/../include/sm_13_double_functions.h"
+	.file	22	"/usr/local/cuda-5.0/bin/../include/sm_20_atomic_functions.h"
+	.file	23	"/usr/local/cuda-5.0/bin/../include/sm_35_atomic_functions.h"
+	.file	24	"/usr/local/cuda-5.0/bin/../include/sm_20_intrinsics.h"
+	.file	25	"/usr/local/cuda-5.0/bin/../include/sm_30_intrinsics.h"
+	.file	26	"/usr/local/cuda-5.0/bin/../include/sm_35_intrinsics.h"
+	.file	27	"/usr/local/cuda-5.0/bin/../include/surface_functions.h"
+	.file	28	"/usr/local/cuda-5.0/bin/../include/texture_fetch_functions.h"
+	.file	29	"/usr/local/cuda-5.0/bin/../include/texture_indirect_functions.h"
+	.file	30	"/usr/local/cuda-5.0/bin/../include/surface_indirect_functions.h"
+	.file	31	"/usr/local/cuda-5.0/bin/../include/math_functions_dbl_ptx1.h"
+
+	.tex .u64 texture_float_1D;
+
+	.entry test_float_1D (
+		.param .u64 __cudaparm_test_float_1D_output,
+		.param .f32 __cudaparm_test_float_1D_posX)
+	{
+	.reg .u64 %rd<3>;
+	.reg .f32 %f<15>;
+	.loc	14	25	0
+$LDWbegin_test_float_1D:
+	.loc	14	27	0
+	ld.param.f32 	%f1, [__cudaparm_test_float_1D_posX];
+	mov.f32 	%f2, %f1;
+	mov.f32 	%f3, 0f00000000;     	// 0
+	mov.f32 	%f4, %f3;
+	mov.f32 	%f5, 0f00000000;     	// 0
+	mov.f32 	%f6, %f5;
+	mov.f32 	%f7, 0f00000000;     	// 0
+	mov.f32 	%f8, %f7;
+	tex.1d.v4.f32.f32 {%f9,%f10,%f11,%f12},[texture_float_1D,{%f2,%f4,%f6,%f8}];
+	mov.f32 	%f13, %f9;
+	.loc	14	28	0
+	ld.param.u64 	%rd1, [__cudaparm_test_float_1D_output];
+	st.global.f32 	[%rd1+0], %f13;
+	.loc	14	29	0
+	exit;
+$LDWend_test_float_1D:
+	} // test_float_1D
+	.tex .u64 texture_float_2D;
+
+	.entry test_float_2D (
+		.param .u64 __cudaparm_test_float_2D_output,
+		.param .f32 __cudaparm_test_float_2D_posX,
+		.param .f32 __cudaparm_test_float_2D_posY)
+	{
+	.reg .u64 %rd<3>;
+	.reg .f32 %f<15>;
+	.loc	14	33	0
+$LDWbegin_test_float_2D:
+	.loc	14	35	0
+	ld.param.f32 	%f1, [__cudaparm_test_float_2D_posX];
+	mov.f32 	%f2, %f1;
+	ld.param.f32 	%f3, [__cudaparm_test_float_2D_posY];
+	mov.f32 	%f4, %f3;
+	mov.f32 	%f5, 0f00000000;     	// 0
+	mov.f32 	%f6, %f5;
+	mov.f32 	%f7, 0f00000000;     	// 0
+	mov.f32 	%f8, %f7;
+	tex.2d.v4.f32.f32 {%f9,%f10,%f11,%f12},[texture_float_2D,{%f2,%f4,%f6,%f8}];
+	mov.f32 	%f13, %f9;
+	.loc	14	36	0
+	ld.param.u64 	%rd1, [__cudaparm_test_float_2D_output];
+	st.global.f32 	[%rd1+0], %f13;
+	.loc	14	37	0
+	exit;
+$LDWend_test_float_2D:
+	} // test_float_2D
+	.tex .u64 texture_float_3D;
+
+	.entry test_float_3D (
+		.param .u64 __cudaparm_test_float_3D_output,
+		.param .f32 __cudaparm_test_float_3D_posX,
+		.param .f32 __cudaparm_test_float_3D_posY,
+		.param .f32 __cudaparm_test_float_3D_posZ)
+	{
+	.reg .u64 %rd<3>;
+	.reg .f32 %f<15>;
+	.loc	14	41	0
+$LDWbegin_test_float_3D:
+	.loc	14	43	0
+	ld.param.f32 	%f1, [__cudaparm_test_float_3D_posX];
+	mov.f32 	%f2, %f1;
+	ld.param.f32 	%f3, [__cudaparm_test_float_3D_posY];
+	mov.f32 	%f4, %f3;
+	ld.param.f32 	%f5, [__cudaparm_test_float_3D_posZ];
+	mov.f32 	%f6, %f5;
+	mov.f32 	%f7, 0f00000000;     	// 0
+	mov.f32 	%f8, %f7;
+	tex.3d.v4.f32.f32 {%f9,%f10,%f11,%f12},[texture_float_3D,{%f2,%f4,%f6,%f8}];
+	mov.f32 	%f13, %f9;
+	.loc	14	44	0
+	ld.param.u64 	%rd1, [__cudaparm_test_float_3D_output];
+	st.global.f32 	[%rd1+0], %f13;
+	.loc	14	45	0
+	exit;
+$LDWend_test_float_3D:
+	} // test_float_3D
+	.tex .u64 texture_float4_1D;
+
+	.entry test_float4_1D (
+		.param .u64 __cudaparm_test_float4_1D_output,
+		.param .f32 __cudaparm_test_float4_1D_posX)
+	{
+	.reg .u64 %rd<3>;
+	.reg .f32 %f<18>;
+	.loc	14	49	0
+$LDWbegin_test_float4_1D:
+	.loc	14	51	0
+	ld.param.f32 	%f1, [__cudaparm_test_float4_1D_posX];
+	mov.f32 	%f2, %f1;
+	mov.f32 	%f3, 0f00000000;     	// 0
+	mov.f32 	%f4, %f3;
+	mov.f32 	%f5, 0f00000000;     	// 0
+	mov.f32 	%f6, %f5;
+	mov.f32 	%f7, 0f00000000;     	// 0
+	mov.f32 	%f8, %f7;
+	tex.1d.v4.f32.f32 {%f9,%f10,%f11,%f12},[texture_float4_1D,{%f2,%f4,%f6,%f8}];
+	mov.f32 	%f13, %f9;
+	mov.f32 	%f14, %f10;
+	mov.f32 	%f15, %f11;
+	mov.f32 	%f16, %f12;
+	.loc	14	52	0
+	ld.param.u64 	%rd1, [__cudaparm_test_float4_1D_output];
+	st.global.v4.f32 	[%rd1+0], {%f13,%f14,%f15,%f16};
+	.loc	14	53	0
+	exit;
+$LDWend_test_float4_1D:
+	} // test_float4_1D
+	.tex .u64 texture_float4_2D;
+
+	.entry test_float4_2D (
+		.param .u64 __cudaparm_test_float4_2D_output,
+		.param .f32 __cudaparm_test_float4_2D_posX,
+		.param .f32 __cudaparm_test_float4_2D_posY)
+	{
+	.reg .u64 %rd<3>;
+	.reg .f32 %f<18>;
+	.loc	14	57	0
+$LDWbegin_test_float4_2D:
+	.loc	14	59	0
+	ld.param.f32 	%f1, [__cudaparm_test_float4_2D_posX];
+	mov.f32 	%f2, %f1;
+	ld.param.f32 	%f3, [__cudaparm_test_float4_2D_posY];
+	mov.f32 	%f4, %f3;
+	mov.f32 	%f5, 0f00000000;     	// 0
+	mov.f32 	%f6, %f5;
+	mov.f32 	%f7, 0f00000000;     	// 0
+	mov.f32 	%f8, %f7;
+	tex.2d.v4.f32.f32 {%f9,%f10,%f11,%f12},[texture_float4_2D,{%f2,%f4,%f6,%f8}];
+	mov.f32 	%f13, %f9;
+	mov.f32 	%f14, %f10;
+	mov.f32 	%f15, %f11;
+	mov.f32 	%f16, %f12;
+	.loc	14	60	0
+	ld.param.u64 	%rd1, [__cudaparm_test_float4_2D_output];
+	st.global.v4.f32 	[%rd1+0], {%f13,%f14,%f15,%f16};
+	.loc	14	61	0
+	exit;
+$LDWend_test_float4_2D:
+	} // test_float4_2D
+	.tex .u64 texture_float4_3D;
+
+	.entry test_float4_3D (
+		.param .u64 __cudaparm_test_float4_3D_output,
+		.param .f32 __cudaparm_test_float4_3D_posX,
+		.param .f32 __cudaparm_test_float4_3D_posY,
+		.param .f32 __cudaparm_test_float4_3D_posZ)
+	{
+	.reg .u64 %rd<3>;
+	.reg .f32 %f<18>;
+	.loc	14	65	0
+$LDWbegin_test_float4_3D:
+	.loc	14	67	0
+	ld.param.f32 	%f1, [__cudaparm_test_float4_3D_posX];
+	mov.f32 	%f2, %f1;
+	ld.param.f32 	%f3, [__cudaparm_test_float4_3D_posY];
+	mov.f32 	%f4, %f3;
+	ld.param.f32 	%f5, [__cudaparm_test_float4_3D_posZ];
+	mov.f32 	%f6, %f5;
+	mov.f32 	%f7, 0f00000000;     	// 0
+	mov.f32 	%f8, %f7;
+	tex.3d.v4.f32.f32 {%f9,%f10,%f11,%f12},[texture_float4_3D,{%f2,%f4,%f6,%f8}];
+	mov.f32 	%f13, %f9;
+	mov.f32 	%f14, %f10;
+	mov.f32 	%f15, %f11;
+	mov.f32 	%f16, %f12;
+	.loc	14	68	0
+	ld.param.u64 	%rd1, [__cudaparm_test_float4_3D_output];
+	st.global.v4.f32 	[%rd1+0], {%f13,%f14,%f15,%f16};
+	.loc	14	69	0
+	exit;
+$LDWend_test_float4_3D:
+	} // test_float4_3D
+

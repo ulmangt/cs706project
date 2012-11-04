@@ -7,15 +7,57 @@ package edu.gmu.ulman.histogram.sample;
  * Copyright 2010 Marco Hutter - http://www.jcuda.org
  */
 
-import static jcuda.driver.JCudaDriver.*;
-import static jcuda.driver.CUfilter_mode.*;
-import static jcuda.driver.CUaddress_mode.*;
-import static jcuda.driver.CUarray_format.*;
+import static jcuda.driver.CUaddress_mode.CU_TR_ADDRESS_MODE_CLAMP;
+import static jcuda.driver.CUarray_format.CU_AD_FORMAT_FLOAT;
+import static jcuda.driver.CUfilter_mode.CU_TR_FILTER_MODE_LINEAR;
+import static jcuda.driver.JCudaDriver.CU_TRSA_OVERRIDE_FORMAT;
+import static jcuda.driver.JCudaDriver.CU_TRSF_NORMALIZED_COORDINATES;
+import static jcuda.driver.JCudaDriver.align;
+import static jcuda.driver.JCudaDriver.cuArray3DCreate;
+import static jcuda.driver.JCudaDriver.cuArrayCreate;
+import static jcuda.driver.JCudaDriver.cuArrayDestroy;
+import static jcuda.driver.JCudaDriver.cuCtxCreate;
+import static jcuda.driver.JCudaDriver.cuCtxSynchronize;
+import static jcuda.driver.JCudaDriver.cuDeviceGet;
+import static jcuda.driver.JCudaDriver.cuFuncSetBlockShape;
+import static jcuda.driver.JCudaDriver.cuInit;
+import static jcuda.driver.JCudaDriver.cuLaunch;
+import static jcuda.driver.JCudaDriver.cuMemAlloc;
+import static jcuda.driver.JCudaDriver.cuMemFree;
+import static jcuda.driver.JCudaDriver.cuMemcpy2D;
+import static jcuda.driver.JCudaDriver.cuMemcpy3D;
+import static jcuda.driver.JCudaDriver.cuMemcpyDtoH;
+import static jcuda.driver.JCudaDriver.cuMemcpyHtoA;
+import static jcuda.driver.JCudaDriver.cuModuleGetFunction;
+import static jcuda.driver.JCudaDriver.cuModuleGetTexRef;
+import static jcuda.driver.JCudaDriver.cuModuleLoad;
+import static jcuda.driver.JCudaDriver.cuParamSetSize;
+import static jcuda.driver.JCudaDriver.cuParamSetv;
+import static jcuda.driver.JCudaDriver.cuTexRefSetAddressMode;
+import static jcuda.driver.JCudaDriver.cuTexRefSetArray;
+import static jcuda.driver.JCudaDriver.cuTexRefSetFilterMode;
+import static jcuda.driver.JCudaDriver.cuTexRefSetFlags;
+import static jcuda.driver.JCudaDriver.cuTexRefSetFormat;
 
+import java.io.IOException;
 import java.util.Arrays;
 
-import jcuda.*;
-import jcuda.driver.*;
+import jcuda.Pointer;
+import jcuda.Sizeof;
+import jcuda.driver.CUDA_ARRAY3D_DESCRIPTOR;
+import jcuda.driver.CUDA_ARRAY_DESCRIPTOR;
+import jcuda.driver.CUDA_MEMCPY2D;
+import jcuda.driver.CUDA_MEMCPY3D;
+import jcuda.driver.CUarray;
+import jcuda.driver.CUcontext;
+import jcuda.driver.CUdevice;
+import jcuda.driver.CUdeviceptr;
+import jcuda.driver.CUfunction;
+import jcuda.driver.CUmemorytype;
+import jcuda.driver.CUmodule;
+import jcuda.driver.CUtexref;
+import jcuda.driver.JCudaDriver;
+import edu.gmu.ulman.histogram.util.PtxUtils;
 
 /**
  * This is a sample/test class for texture reference handling. <br />
@@ -72,51 +114,53 @@ public class JCudaDriverTextureTest
      * The entry point of this test
      * 
      * @param args Not used
+     * @throws IOException 
      */
-    public static void main(String args[])
+    public static void main( String args[] ) throws IOException
     {
         // Initialize the driver and create a context for the first device.
-        JCudaDriver.setExceptionsEnabled(true);
-        cuInit(0);
-        CUcontext pctx = new CUcontext();
-        CUdevice dev = new CUdevice();
-        cuDeviceGet(dev, 0);
-        cuCtxCreate(pctx, 0, dev);
+        JCudaDriver.setExceptionsEnabled( true );
+        cuInit( 0 );
+        CUcontext pctx = new CUcontext( );
+        CUdevice dev = new CUdevice( );
+        cuDeviceGet( dev, 0 );
+        cuCtxCreate( pctx, 0, dev );
 
         // Load the CUBIN file containing the kernels
-        module = new CUmodule();
-        cuModuleLoad(module, "JCudaDriverTextureTestKernels.cubin");
+        String ptxFileName = PtxUtils.preparePtxFile( "src/main/java/resources/JCudaDriverTextureTestKernels.cu" );
+        module = new CUmodule( );
+        cuModuleLoad( module, ptxFileName );
 
         // Initialize the host input data
-        initInputHost();
+        initInputHost( );
 
         // Perform the tests
         boolean passed = true;
-        passed &= test_float_1D();
-        passed &= test_float_2D();
-        passed &= test_float_3D();
-        passed &= test_float4_1D();
-        passed &= test_float4_2D();
-        passed &= test_float4_3D();
-        System.out.println("Tests " + (passed ? "PASSED" : "FAILED"));
+        passed &= test_float_1D( );
+        passed &= test_float_2D( );
+        passed &= test_float_3D( );
+        passed &= test_float4_1D( );
+        passed &= test_float4_2D( );
+        passed &= test_float4_3D( );
+        System.out.println( "Tests " + ( passed ? "PASSED" : "FAILED" ) );
     }
 
     /**
      * Initialize all input arrays, namely the 1D-3D float and float4 arrays
      */
-    private static void initInputHost()
+    private static void initInputHost( )
     {
         input_float_1D = new float[sizeX];
         input_float_2D = new float[sizeX * sizeY];
         input_float_3D = new float[sizeX * sizeY * sizeZ];
-        for (int x = 0; x < sizeX; x++)
+        for ( int x = 0; x < sizeX; x++ )
         {
             input_float_1D[x] = x;
-            for (int y = 0; y < sizeY; y++)
+            for ( int y = 0; y < sizeY; y++ )
             {
                 int xy = x + y * sizeY;
                 input_float_2D[xy] = xy;
-                for (int z = 0; z < sizeZ; z++)
+                for ( int z = 0; z < sizeZ; z++ )
                 {
                     int xyz = xy + z * sizeX * sizeY;
                     input_float_3D[xyz] = xyz;
@@ -127,20 +171,20 @@ public class JCudaDriverTextureTest
         input_float4_1D = new float[sizeX * 4];
         input_float4_2D = new float[sizeX * sizeY * 4];
         input_float4_3D = new float[sizeX * sizeY * sizeZ * 4];
-        for (int x = 0; x < sizeX; x++)
+        for ( int x = 0; x < sizeX; x++ )
         {
             input_float4_1D[x * 4 + 0] = x;
             input_float4_1D[x * 4 + 1] = x;
             input_float4_1D[x * 4 + 2] = x;
             input_float4_1D[x * 4 + 3] = x;
-            for (int y = 0; y < sizeY; y++)
+            for ( int y = 0; y < sizeY; y++ )
             {
                 int xy = x + y * sizeY;
                 input_float4_2D[xy * 4 + 0] = xy;
                 input_float4_2D[xy * 4 + 1] = xy;
                 input_float4_2D[xy * 4 + 2] = xy;
                 input_float4_2D[xy * 4 + 3] = xy;
-                for (int z = 0; z < sizeZ; z++)
+                for ( int z = 0; z < sizeZ; z++ )
                 {
                     int xyz = xy + z * sizeX * sizeY;
                     input_float4_3D[xyz * 4 + 0] = xyz;
@@ -155,69 +199,68 @@ public class JCudaDriverTextureTest
     /**
      * Test the 1D float texture access
      */
-    private static boolean test_float_1D()
+    private static boolean test_float_1D( )
     {
         // Create the array on the device
-        CUarray array = new CUarray();
-        CUDA_ARRAY_DESCRIPTOR ad = new CUDA_ARRAY_DESCRIPTOR();
+        CUarray array = new CUarray( );
+        CUDA_ARRAY_DESCRIPTOR ad = new CUDA_ARRAY_DESCRIPTOR( );
         ad.Format = CU_AD_FORMAT_FLOAT;
         ad.Width = sizeX;
         ad.Height = 1;
         ad.NumChannels = 1;
-        cuArrayCreate(array, ad);
+        cuArrayCreate( array, ad );
 
         // Copy the host input to the array
-        Pointer pInput = Pointer.to(input_float_1D);
-        cuMemcpyHtoA(array, 0, pInput, sizeX * Sizeof.FLOAT);
+        Pointer pInput = Pointer.to( input_float_1D );
+        cuMemcpyHtoA( array, 0, pInput, sizeX * Sizeof.FLOAT );
 
         // Set up the texture reference
-        CUtexref texref = new CUtexref();
-        cuModuleGetTexRef(texref, module, "texture_float_1D");
-        cuTexRefSetFilterMode(texref, CU_TR_FILTER_MODE_LINEAR);
-        cuTexRefSetAddressMode(texref, 0, CU_TR_ADDRESS_MODE_CLAMP);
-        cuTexRefSetFlags(texref, CU_TRSF_NORMALIZED_COORDINATES);
-        cuTexRefSetFormat(texref, CU_AD_FORMAT_FLOAT, 1);
-        cuTexRefSetArray(texref, array, CU_TRSA_OVERRIDE_FORMAT);
+        CUtexref texref = new CUtexref( );
+        cuModuleGetTexRef( texref, module, "texture_float_1D" );
+        cuTexRefSetFilterMode( texref, CU_TR_FILTER_MODE_LINEAR );
+        cuTexRefSetAddressMode( texref, 0, CU_TR_ADDRESS_MODE_CLAMP );
+        cuTexRefSetFlags( texref, CU_TRSF_NORMALIZED_COORDINATES );
+        cuTexRefSetFormat( texref, CU_AD_FORMAT_FLOAT, 1 );
+        cuTexRefSetArray( texref, array, CU_TRSA_OVERRIDE_FORMAT );
 
         // Prepare the output device memory
-        CUdeviceptr dOutput = new CUdeviceptr();
-        cuMemAlloc(dOutput, Sizeof.FLOAT * 1);
+        CUdeviceptr dOutput = new CUdeviceptr( );
+        cuMemAlloc( dOutput, Sizeof.FLOAT * 1 );
 
         // Obtain the test function
-        CUfunction function = new CUfunction();
-        cuModuleGetFunction(function, module, "test_float_1D");
-        cuFuncSetBlockShape(function, 1, 1, 1);
+        CUfunction function = new CUfunction( );
+        cuModuleGetFunction( function, module, "test_float_1D" );
+        cuFuncSetBlockShape( function, 1, 1, 1 );
 
         // Set up the function parameters 
-        Pointer pOutput = Pointer.to(dOutput);
-        Pointer pPosX = Pointer.to(new float[]{ posX });
+        Pointer pOutput = Pointer.to( dOutput );
+        Pointer pPosX = Pointer.to( new float[] { posX } );
         int offset = 0;
-        offset = align(offset, Sizeof.POINTER);
-        cuParamSetv(function, offset, pOutput, Sizeof.POINTER);
+        offset = align( offset, Sizeof.POINTER );
+        cuParamSetv( function, offset, pOutput, Sizeof.POINTER );
         offset += Sizeof.POINTER;
-        offset = align(offset, Sizeof.FLOAT);
-        cuParamSetv(function, offset, pPosX, Sizeof.FLOAT);
+        offset = align( offset, Sizeof.FLOAT );
+        cuParamSetv( function, offset, pPosX, Sizeof.FLOAT );
         offset += Sizeof.FLOAT;
-        cuParamSetSize(function, offset);
+        cuParamSetSize( function, offset );
 
         // Call the function.
-        cuLaunch(function);
-        cuCtxSynchronize();
+        cuLaunch( function );
+        cuCtxSynchronize( );
 
         // Obtain the output on the host
         float hOutput[] = new float[1];
-        cuMemcpyDtoH(Pointer.to(hOutput), dOutput, Sizeof.FLOAT * 1);
+        cuMemcpyDtoH( Pointer.to( hOutput ), dOutput, Sizeof.FLOAT * 1 );
 
         // Print the results
-        System.out.println("Result float  1D " + Arrays.toString(hOutput));
-        float expected[] = new float[]{ 0.5f };
-        boolean passed = Arrays.equals(hOutput, expected);
-        System.out.println("Test   float  1D " + 
-            (passed ? "PASSED" : "FAILED"));
+        System.out.println( "Result float  1D " + Arrays.toString( hOutput ) );
+        float expected[] = new float[] { 0.5f };
+        boolean passed = Arrays.equals( hOutput, expected );
+        System.out.println( "Test   float  1D " + ( passed ? "PASSED" : "FAILED" ) );
 
         // Clean up
-        cuArrayDestroy(array);
-        cuMemFree(dOutput);
+        cuArrayDestroy( array );
+        cuMemFree( dOutput );
 
         return passed;
     }
@@ -225,81 +268,80 @@ public class JCudaDriverTextureTest
     /**
      * Test the 2D float texture access
      */
-    private static boolean test_float_2D()
+    private static boolean test_float_2D( )
     {
         // Create the array on the device
-        CUarray array = new CUarray();
-        CUDA_ARRAY_DESCRIPTOR ad = new CUDA_ARRAY_DESCRIPTOR();
+        CUarray array = new CUarray( );
+        CUDA_ARRAY_DESCRIPTOR ad = new CUDA_ARRAY_DESCRIPTOR( );
         ad.Format = CU_AD_FORMAT_FLOAT;
         ad.Width = sizeX;
         ad.Height = sizeY;
         ad.NumChannels = 1;
-        cuArrayCreate(array, ad);
+        cuArrayCreate( array, ad );
 
         // Copy the host input to the array
-        CUDA_MEMCPY2D copyHD = new CUDA_MEMCPY2D();
+        CUDA_MEMCPY2D copyHD = new CUDA_MEMCPY2D( );
         copyHD.srcMemoryType = CUmemorytype.CU_MEMORYTYPE_HOST;
-        copyHD.srcHost = Pointer.to(input_float_2D);
+        copyHD.srcHost = Pointer.to( input_float_2D );
         copyHD.srcPitch = sizeX * Sizeof.FLOAT;
         copyHD.dstMemoryType = CUmemorytype.CU_MEMORYTYPE_ARRAY;
         copyHD.dstArray = array;
         copyHD.WidthInBytes = sizeX * Sizeof.FLOAT;
         copyHD.Height = sizeY;
-        cuMemcpy2D(copyHD);
+        cuMemcpy2D( copyHD );
 
         // Set up the texture reference
-        CUtexref texref = new CUtexref();
-        cuModuleGetTexRef(texref, module, "texture_float_2D");
-        cuTexRefSetFilterMode(texref, CU_TR_FILTER_MODE_LINEAR);
-        cuTexRefSetAddressMode(texref, 0, CU_TR_ADDRESS_MODE_CLAMP);
-        cuTexRefSetAddressMode(texref, 1, CU_TR_ADDRESS_MODE_CLAMP);
-        cuTexRefSetFlags(texref, CU_TRSF_NORMALIZED_COORDINATES);
-        cuTexRefSetFormat(texref, CU_AD_FORMAT_FLOAT, 1);
-        cuTexRefSetArray(texref, array, CU_TRSA_OVERRIDE_FORMAT);
+        CUtexref texref = new CUtexref( );
+        cuModuleGetTexRef( texref, module, "texture_float_2D" );
+        cuTexRefSetFilterMode( texref, CU_TR_FILTER_MODE_LINEAR );
+        cuTexRefSetAddressMode( texref, 0, CU_TR_ADDRESS_MODE_CLAMP );
+        cuTexRefSetAddressMode( texref, 1, CU_TR_ADDRESS_MODE_CLAMP );
+        cuTexRefSetFlags( texref, CU_TRSF_NORMALIZED_COORDINATES );
+        cuTexRefSetFormat( texref, CU_AD_FORMAT_FLOAT, 1 );
+        cuTexRefSetArray( texref, array, CU_TRSA_OVERRIDE_FORMAT );
 
         // Prepare the output device memory
-        CUdeviceptr dOutput = new CUdeviceptr();
-        cuMemAlloc(dOutput, Sizeof.FLOAT * 1);
+        CUdeviceptr dOutput = new CUdeviceptr( );
+        cuMemAlloc( dOutput, Sizeof.FLOAT * 1 );
 
         // Obtain the test function
-        CUfunction function = new CUfunction();
-        cuModuleGetFunction(function, module, "test_float_2D");
-        cuFuncSetBlockShape(function, 1, 1, 1);
+        CUfunction function = new CUfunction( );
+        cuModuleGetFunction( function, module, "test_float_2D" );
+        cuFuncSetBlockShape( function, 1, 1, 1 );
 
         // Set up the function parameters 
-        Pointer pOutput = Pointer.to(dOutput);
-        Pointer pPosX = Pointer.to(new float[]{ posX });
-        Pointer pPosY = Pointer.to(new float[]{ posY });
+        Pointer pOutput = Pointer.to( dOutput );
+        Pointer pPosX = Pointer.to( new float[] { posX } );
+        Pointer pPosY = Pointer.to( new float[] { posY } );
         int offset = 0;
-        offset = align(offset, Sizeof.POINTER);
-        cuParamSetv(function, offset, pOutput, Sizeof.POINTER);
+        offset = align( offset, Sizeof.POINTER );
+        cuParamSetv( function, offset, pOutput, Sizeof.POINTER );
         offset += Sizeof.POINTER;
-        offset = align(offset, Sizeof.FLOAT);
-        cuParamSetv(function, offset, pPosX, Sizeof.FLOAT);
+        offset = align( offset, Sizeof.FLOAT );
+        cuParamSetv( function, offset, pPosX, Sizeof.FLOAT );
         offset += Sizeof.FLOAT;
-        offset = align(offset, Sizeof.FLOAT);
-        cuParamSetv(function, offset, pPosY, Sizeof.FLOAT);
+        offset = align( offset, Sizeof.FLOAT );
+        cuParamSetv( function, offset, pPosY, Sizeof.FLOAT );
         offset += Sizeof.FLOAT;
-        cuParamSetSize(function, offset);
+        cuParamSetSize( function, offset );
 
         // Call the function.
-        cuLaunch(function);
-        cuCtxSynchronize();
+        cuLaunch( function );
+        cuCtxSynchronize( );
 
         // Obtain the output on the host
         float hOutput[] = new float[1];
-        cuMemcpyDtoH(Pointer.to(hOutput), dOutput, Sizeof.FLOAT * 1);
+        cuMemcpyDtoH( Pointer.to( hOutput ), dOutput, Sizeof.FLOAT * 1 );
 
         // Print the results
-        System.out.println("Result float  2D " + Arrays.toString(hOutput));
-        float expected[] = new float[]{ 1.5f };
-        boolean passed = Arrays.equals(hOutput, expected);
-        System.out.println("Test   float  2D " + 
-            (passed ? "PASSED" : "FAILED"));
+        System.out.println( "Result float  2D " + Arrays.toString( hOutput ) );
+        float expected[] = new float[] { 1.5f };
+        boolean passed = Arrays.equals( hOutput, expected );
+        System.out.println( "Test   float  2D " + ( passed ? "PASSED" : "FAILED" ) );
 
         // Clean up
-        cuArrayDestroy(array);
-        cuMemFree(dOutput);
+        cuArrayDestroy( array );
+        cuMemFree( dOutput );
 
         return passed;
     }
@@ -307,22 +349,22 @@ public class JCudaDriverTextureTest
     /**
      * Test the 3D float texture access
      */
-    private static boolean test_float_3D()
+    private static boolean test_float_3D( )
     {
         // Create the array on the device
-        CUarray array = new CUarray();
-        CUDA_ARRAY3D_DESCRIPTOR ad = new CUDA_ARRAY3D_DESCRIPTOR();
+        CUarray array = new CUarray( );
+        CUDA_ARRAY3D_DESCRIPTOR ad = new CUDA_ARRAY3D_DESCRIPTOR( );
         ad.Format = CU_AD_FORMAT_FLOAT;
         ad.Width = sizeX;
         ad.Height = sizeY;
         ad.Depth = sizeZ;
         ad.NumChannels = 1;
-        cuArray3DCreate(array, ad);
+        cuArray3DCreate( array, ad );
 
         // Copy the host input to the array
-        CUDA_MEMCPY3D copy = new CUDA_MEMCPY3D();
+        CUDA_MEMCPY3D copy = new CUDA_MEMCPY3D( );
         copy.srcMemoryType = CUmemorytype.CU_MEMORYTYPE_HOST;
-        copy.srcHost = Pointer.to(input_float_3D);
+        copy.srcHost = Pointer.to( input_float_3D );
         copy.srcPitch = sizeX * Sizeof.FLOAT;
         copy.srcHeight = sizeY;
         copy.dstMemoryType = CUmemorytype.CU_MEMORYTYPE_ARRAY;
@@ -331,66 +373,65 @@ public class JCudaDriverTextureTest
         copy.WidthInBytes = sizeX * Sizeof.FLOAT;
         copy.Height = sizeY;
         copy.Depth = sizeZ;
-        cuMemcpy3D(copy);
+        cuMemcpy3D( copy );
 
         // Set up the texture reference
-        CUtexref texref = new CUtexref();
-        cuModuleGetTexRef(texref, module, "texture_float_3D");
-        cuTexRefSetFilterMode(texref, CU_TR_FILTER_MODE_LINEAR);
-        cuTexRefSetAddressMode(texref, 0, CU_TR_ADDRESS_MODE_CLAMP);
-        cuTexRefSetAddressMode(texref, 1, CU_TR_ADDRESS_MODE_CLAMP);
-        cuTexRefSetAddressMode(texref, 2, CU_TR_ADDRESS_MODE_CLAMP);
-        cuTexRefSetFlags(texref, CU_TRSF_NORMALIZED_COORDINATES);
-        cuTexRefSetFormat(texref, CU_AD_FORMAT_FLOAT, 1);
-        cuTexRefSetArray(texref, array, CU_TRSA_OVERRIDE_FORMAT);
+        CUtexref texref = new CUtexref( );
+        cuModuleGetTexRef( texref, module, "texture_float_3D" );
+        cuTexRefSetFilterMode( texref, CU_TR_FILTER_MODE_LINEAR );
+        cuTexRefSetAddressMode( texref, 0, CU_TR_ADDRESS_MODE_CLAMP );
+        cuTexRefSetAddressMode( texref, 1, CU_TR_ADDRESS_MODE_CLAMP );
+        cuTexRefSetAddressMode( texref, 2, CU_TR_ADDRESS_MODE_CLAMP );
+        cuTexRefSetFlags( texref, CU_TRSF_NORMALIZED_COORDINATES );
+        cuTexRefSetFormat( texref, CU_AD_FORMAT_FLOAT, 1 );
+        cuTexRefSetArray( texref, array, CU_TRSA_OVERRIDE_FORMAT );
 
         // Prepare the output device memory
-        CUdeviceptr dOutput = new CUdeviceptr();
-        cuMemAlloc(dOutput, Sizeof.FLOAT * 1);
+        CUdeviceptr dOutput = new CUdeviceptr( );
+        cuMemAlloc( dOutput, Sizeof.FLOAT * 1 );
 
         // Obtain the test function
-        CUfunction function = new CUfunction();
-        cuModuleGetFunction(function, module, "test_float_3D");
-        cuFuncSetBlockShape(function, 1, 1, 1);
+        CUfunction function = new CUfunction( );
+        cuModuleGetFunction( function, module, "test_float_3D" );
+        cuFuncSetBlockShape( function, 1, 1, 1 );
 
         // Set up the function parameters 
-        Pointer pOutput = Pointer.to(dOutput);
-        Pointer pPosX = Pointer.to(new float[]{ posX });
-        Pointer pPosY = Pointer.to(new float[]{ posY });
-        Pointer pPosZ = Pointer.to(new float[]{ posZ });
+        Pointer pOutput = Pointer.to( dOutput );
+        Pointer pPosX = Pointer.to( new float[] { posX } );
+        Pointer pPosY = Pointer.to( new float[] { posY } );
+        Pointer pPosZ = Pointer.to( new float[] { posZ } );
         int offset = 0;
-        offset = align(offset, Sizeof.POINTER);
-        cuParamSetv(function, offset, pOutput, Sizeof.POINTER);
+        offset = align( offset, Sizeof.POINTER );
+        cuParamSetv( function, offset, pOutput, Sizeof.POINTER );
         offset += Sizeof.POINTER;
-        offset = align(offset, Sizeof.FLOAT);
-        cuParamSetv(function, offset, pPosX, Sizeof.FLOAT);
+        offset = align( offset, Sizeof.FLOAT );
+        cuParamSetv( function, offset, pPosX, Sizeof.FLOAT );
         offset += Sizeof.FLOAT;
-        offset = align(offset, Sizeof.FLOAT);
-        cuParamSetv(function, offset, pPosY, Sizeof.FLOAT);
+        offset = align( offset, Sizeof.FLOAT );
+        cuParamSetv( function, offset, pPosY, Sizeof.FLOAT );
         offset += Sizeof.FLOAT;
-        offset = align(offset, Sizeof.FLOAT);
-        cuParamSetv(function, offset, pPosZ, Sizeof.FLOAT);
+        offset = align( offset, Sizeof.FLOAT );
+        cuParamSetv( function, offset, pPosZ, Sizeof.FLOAT );
         offset += Sizeof.FLOAT;
-        cuParamSetSize(function, offset);
+        cuParamSetSize( function, offset );
 
         // Call the function.
-        cuLaunch(function);
-        cuCtxSynchronize();
+        cuLaunch( function );
+        cuCtxSynchronize( );
 
         // Obtain the output on the host
         float hOutput[] = new float[1];
-        cuMemcpyDtoH(Pointer.to(hOutput), dOutput, Sizeof.FLOAT * 1);
+        cuMemcpyDtoH( Pointer.to( hOutput ), dOutput, Sizeof.FLOAT * 1 );
 
         // Print the results
-        System.out.println("Result float  3D " + Arrays.toString(hOutput));
-        float expected[] = new float[]{ 3.5f };
-        boolean passed = Arrays.equals(hOutput, expected);
-        System.out.println("Test   float  3D " + 
-            (passed ? "PASSED" : "FAILED"));
+        System.out.println( "Result float  3D " + Arrays.toString( hOutput ) );
+        float expected[] = new float[] { 3.5f };
+        boolean passed = Arrays.equals( hOutput, expected );
+        System.out.println( "Test   float  3D " + ( passed ? "PASSED" : "FAILED" ) );
 
         // Clean up
-        cuArrayDestroy(array);
-        cuMemFree(dOutput);
+        cuArrayDestroy( array );
+        cuMemFree( dOutput );
 
         return passed;
     }
@@ -398,69 +439,68 @@ public class JCudaDriverTextureTest
     /**
      * Test the 1D float4 texture access
      */
-    private static boolean test_float4_1D()
+    private static boolean test_float4_1D( )
     {
         // Create the array on the device
-        CUarray array = new CUarray();
-        CUDA_ARRAY_DESCRIPTOR ad = new CUDA_ARRAY_DESCRIPTOR();
+        CUarray array = new CUarray( );
+        CUDA_ARRAY_DESCRIPTOR ad = new CUDA_ARRAY_DESCRIPTOR( );
         ad.Format = CU_AD_FORMAT_FLOAT;
         ad.Width = sizeX;
         ad.Height = 1;
         ad.NumChannels = 4;
-        cuArrayCreate(array, ad);
+        cuArrayCreate( array, ad );
 
         // Copy the host input to the array
-        Pointer pInput = Pointer.to(input_float4_1D);
-        cuMemcpyHtoA(array, 0, pInput, sizeX * Sizeof.FLOAT * 4);
+        Pointer pInput = Pointer.to( input_float4_1D );
+        cuMemcpyHtoA( array, 0, pInput, sizeX * Sizeof.FLOAT * 4 );
 
         // Set up the texture reference
-        CUtexref texref = new CUtexref();
-        cuModuleGetTexRef(texref, module, "texture_float4_1D");
-        cuTexRefSetFilterMode(texref, CU_TR_FILTER_MODE_LINEAR);
-        cuTexRefSetAddressMode(texref, 0, CU_TR_ADDRESS_MODE_CLAMP);
-        cuTexRefSetFlags(texref, CU_TRSF_NORMALIZED_COORDINATES);
-        cuTexRefSetFormat(texref, CU_AD_FORMAT_FLOAT, 4);
-        cuTexRefSetArray(texref, array, CU_TRSA_OVERRIDE_FORMAT);
+        CUtexref texref = new CUtexref( );
+        cuModuleGetTexRef( texref, module, "texture_float4_1D" );
+        cuTexRefSetFilterMode( texref, CU_TR_FILTER_MODE_LINEAR );
+        cuTexRefSetAddressMode( texref, 0, CU_TR_ADDRESS_MODE_CLAMP );
+        cuTexRefSetFlags( texref, CU_TRSF_NORMALIZED_COORDINATES );
+        cuTexRefSetFormat( texref, CU_AD_FORMAT_FLOAT, 4 );
+        cuTexRefSetArray( texref, array, CU_TRSA_OVERRIDE_FORMAT );
 
         // Prepare the output device memory
-        CUdeviceptr dOutput = new CUdeviceptr();
-        cuMemAlloc(dOutput, Sizeof.FLOAT * 4);
+        CUdeviceptr dOutput = new CUdeviceptr( );
+        cuMemAlloc( dOutput, Sizeof.FLOAT * 4 );
 
         // Obtain the test function
-        CUfunction function = new CUfunction();
-        cuModuleGetFunction(function, module, "test_float4_1D");
-        cuFuncSetBlockShape(function, 1, 1, 1);
+        CUfunction function = new CUfunction( );
+        cuModuleGetFunction( function, module, "test_float4_1D" );
+        cuFuncSetBlockShape( function, 1, 1, 1 );
 
         // Set up the function parameters 
-        Pointer pOutput = Pointer.to(dOutput);
-        Pointer pPosX = Pointer.to(new float[]{ posX });
+        Pointer pOutput = Pointer.to( dOutput );
+        Pointer pPosX = Pointer.to( new float[] { posX } );
         int offset = 0;
-        offset = align(offset, Sizeof.POINTER);
-        cuParamSetv(function, offset, pOutput, Sizeof.POINTER);
+        offset = align( offset, Sizeof.POINTER );
+        cuParamSetv( function, offset, pOutput, Sizeof.POINTER );
         offset += Sizeof.POINTER;
-        offset = align(offset, Sizeof.FLOAT);
-        cuParamSetv(function, offset, pPosX, Sizeof.FLOAT);
+        offset = align( offset, Sizeof.FLOAT );
+        cuParamSetv( function, offset, pPosX, Sizeof.FLOAT );
         offset += Sizeof.FLOAT;
-        cuParamSetSize(function, offset);
+        cuParamSetSize( function, offset );
 
         // Call the function.
-        cuLaunch(function);
-        cuCtxSynchronize();
+        cuLaunch( function );
+        cuCtxSynchronize( );
 
         // Obtain the output on the host
         float hOutput[] = new float[4];
-        cuMemcpyDtoH(Pointer.to(hOutput), dOutput, Sizeof.FLOAT * 4);
+        cuMemcpyDtoH( Pointer.to( hOutput ), dOutput, Sizeof.FLOAT * 4 );
 
         // Print the results
-        System.out.println("Result float4 1D " + Arrays.toString(hOutput));
-        float expected[] = new float[]{ 0.5f, 0.5f, 0.5f, 0.5f };
-        boolean passed = Arrays.equals(hOutput, expected);
-        System.out.println("Test   float4 1D " + 
-            (passed ? "PASSED" : "FAILED"));
+        System.out.println( "Result float4 1D " + Arrays.toString( hOutput ) );
+        float expected[] = new float[] { 0.5f, 0.5f, 0.5f, 0.5f };
+        boolean passed = Arrays.equals( hOutput, expected );
+        System.out.println( "Test   float4 1D " + ( passed ? "PASSED" : "FAILED" ) );
 
         // Clean up
-        cuArrayDestroy(array);
-        cuMemFree(dOutput);
+        cuArrayDestroy( array );
+        cuMemFree( dOutput );
 
         return passed;
     }
@@ -468,81 +508,80 @@ public class JCudaDriverTextureTest
     /**
      * Test the 2D float4 texture access
      */
-    private static boolean test_float4_2D()
+    private static boolean test_float4_2D( )
     {
         // Create the array on the device
-        CUarray array = new CUarray();
-        CUDA_ARRAY_DESCRIPTOR ad = new CUDA_ARRAY_DESCRIPTOR();
+        CUarray array = new CUarray( );
+        CUDA_ARRAY_DESCRIPTOR ad = new CUDA_ARRAY_DESCRIPTOR( );
         ad.Format = CU_AD_FORMAT_FLOAT;
         ad.Width = sizeX;
         ad.Height = sizeY;
         ad.NumChannels = 4;
-        cuArrayCreate(array, ad);
+        cuArrayCreate( array, ad );
 
         // Copy the host input to the array
-        CUDA_MEMCPY2D copyHD = new CUDA_MEMCPY2D();
+        CUDA_MEMCPY2D copyHD = new CUDA_MEMCPY2D( );
         copyHD.srcMemoryType = CUmemorytype.CU_MEMORYTYPE_HOST;
-        copyHD.srcHost = Pointer.to(input_float4_2D);
+        copyHD.srcHost = Pointer.to( input_float4_2D );
         copyHD.srcPitch = sizeX * Sizeof.FLOAT * 4;
         copyHD.dstMemoryType = CUmemorytype.CU_MEMORYTYPE_ARRAY;
         copyHD.dstArray = array;
         copyHD.WidthInBytes = sizeX * Sizeof.FLOAT * 4;
         copyHD.Height = sizeY;
-        cuMemcpy2D(copyHD);
+        cuMemcpy2D( copyHD );
 
         // Set up the texture reference
-        CUtexref texref = new CUtexref();
-        cuModuleGetTexRef(texref, module, "texture_float4_2D");
-        cuTexRefSetFilterMode(texref, CU_TR_FILTER_MODE_LINEAR);
-        cuTexRefSetAddressMode(texref, 0, CU_TR_ADDRESS_MODE_CLAMP);
-        cuTexRefSetAddressMode(texref, 1, CU_TR_ADDRESS_MODE_CLAMP);
-        cuTexRefSetFlags(texref, CU_TRSF_NORMALIZED_COORDINATES);
-        cuTexRefSetFormat(texref, CU_AD_FORMAT_FLOAT, 4);
-        cuTexRefSetArray(texref, array, CU_TRSA_OVERRIDE_FORMAT);
+        CUtexref texref = new CUtexref( );
+        cuModuleGetTexRef( texref, module, "texture_float4_2D" );
+        cuTexRefSetFilterMode( texref, CU_TR_FILTER_MODE_LINEAR );
+        cuTexRefSetAddressMode( texref, 0, CU_TR_ADDRESS_MODE_CLAMP );
+        cuTexRefSetAddressMode( texref, 1, CU_TR_ADDRESS_MODE_CLAMP );
+        cuTexRefSetFlags( texref, CU_TRSF_NORMALIZED_COORDINATES );
+        cuTexRefSetFormat( texref, CU_AD_FORMAT_FLOAT, 4 );
+        cuTexRefSetArray( texref, array, CU_TRSA_OVERRIDE_FORMAT );
 
         // Prepare the output device memory
-        CUdeviceptr dOutput = new CUdeviceptr();
-        cuMemAlloc(dOutput, Sizeof.FLOAT * 4);
+        CUdeviceptr dOutput = new CUdeviceptr( );
+        cuMemAlloc( dOutput, Sizeof.FLOAT * 4 );
 
         // Obtain the test function
-        CUfunction function = new CUfunction();
-        cuModuleGetFunction(function, module, "test_float4_2D");
-        cuFuncSetBlockShape(function, 1, 1, 1);
+        CUfunction function = new CUfunction( );
+        cuModuleGetFunction( function, module, "test_float4_2D" );
+        cuFuncSetBlockShape( function, 1, 1, 1 );
 
         // Set up the function parameters 
-        Pointer pOutput = Pointer.to(dOutput);
-        Pointer pPosX = Pointer.to(new float[]{ posX });
-        Pointer pPosY = Pointer.to(new float[]{ posY });
+        Pointer pOutput = Pointer.to( dOutput );
+        Pointer pPosX = Pointer.to( new float[] { posX } );
+        Pointer pPosY = Pointer.to( new float[] { posY } );
         int offset = 0;
-        offset = align(offset, Sizeof.POINTER);
-        cuParamSetv(function, offset, pOutput, Sizeof.POINTER);
+        offset = align( offset, Sizeof.POINTER );
+        cuParamSetv( function, offset, pOutput, Sizeof.POINTER );
         offset += Sizeof.POINTER;
-        offset = align(offset, Sizeof.FLOAT);
-        cuParamSetv(function, offset, pPosX, Sizeof.FLOAT);
+        offset = align( offset, Sizeof.FLOAT );
+        cuParamSetv( function, offset, pPosX, Sizeof.FLOAT );
         offset += Sizeof.FLOAT;
-        offset = align(offset, Sizeof.FLOAT);
-        cuParamSetv(function, offset, pPosY, Sizeof.FLOAT);
+        offset = align( offset, Sizeof.FLOAT );
+        cuParamSetv( function, offset, pPosY, Sizeof.FLOAT );
         offset += Sizeof.FLOAT;
-        cuParamSetSize(function, offset);
+        cuParamSetSize( function, offset );
 
         // Call the function.
-        cuLaunch(function);
-        cuCtxSynchronize();
+        cuLaunch( function );
+        cuCtxSynchronize( );
 
         // Obtain the output on the host
         float hOutput[] = new float[4];
-        cuMemcpyDtoH(Pointer.to(hOutput), dOutput, Sizeof.FLOAT * 4);
+        cuMemcpyDtoH( Pointer.to( hOutput ), dOutput, Sizeof.FLOAT * 4 );
 
         // Print the results
-        System.out.println("Result float4 2D " + Arrays.toString(hOutput));
-        float expected[] = new float[]{ 1.5f, 1.5f, 1.5f, 1.5f };
-        boolean passed = Arrays.equals(hOutput, expected);
-        System.out.println("Test   float4 2D " + 
-            (passed ? "PASSED" : "FAILED"));
+        System.out.println( "Result float4 2D " + Arrays.toString( hOutput ) );
+        float expected[] = new float[] { 1.5f, 1.5f, 1.5f, 1.5f };
+        boolean passed = Arrays.equals( hOutput, expected );
+        System.out.println( "Test   float4 2D " + ( passed ? "PASSED" : "FAILED" ) );
 
         // Clean up
-        cuArrayDestroy(array);
-        cuMemFree(dOutput);
+        cuArrayDestroy( array );
+        cuMemFree( dOutput );
 
         return passed;
     }
@@ -550,22 +589,22 @@ public class JCudaDriverTextureTest
     /**
      * Test the 3D float4 texture access
      */
-    private static boolean test_float4_3D()
+    private static boolean test_float4_3D( )
     {
         // Create the array on the device
-        CUarray array = new CUarray();
-        CUDA_ARRAY3D_DESCRIPTOR ad = new CUDA_ARRAY3D_DESCRIPTOR();
+        CUarray array = new CUarray( );
+        CUDA_ARRAY3D_DESCRIPTOR ad = new CUDA_ARRAY3D_DESCRIPTOR( );
         ad.Format = CU_AD_FORMAT_FLOAT;
         ad.Width = sizeX;
         ad.Height = sizeY;
         ad.Depth = sizeZ;
         ad.NumChannels = 4;
-        cuArray3DCreate(array, ad);
+        cuArray3DCreate( array, ad );
 
         // Copy the host input to the array
-        CUDA_MEMCPY3D copy = new CUDA_MEMCPY3D();
+        CUDA_MEMCPY3D copy = new CUDA_MEMCPY3D( );
         copy.srcMemoryType = CUmemorytype.CU_MEMORYTYPE_HOST;
-        copy.srcHost = Pointer.to(input_float4_3D);
+        copy.srcHost = Pointer.to( input_float4_3D );
         copy.srcPitch = sizeX * Sizeof.FLOAT * 4;
         copy.srcHeight = sizeY;
         copy.dstMemoryType = CUmemorytype.CU_MEMORYTYPE_ARRAY;
@@ -574,66 +613,65 @@ public class JCudaDriverTextureTest
         copy.WidthInBytes = sizeX * Sizeof.FLOAT * 4;
         copy.Height = sizeY;
         copy.Depth = sizeZ;
-        cuMemcpy3D(copy);
+        cuMemcpy3D( copy );
 
         // Set up the texture reference
-        CUtexref texref = new CUtexref();
-        cuModuleGetTexRef(texref, module, "texture_float4_3D");
-        cuTexRefSetFilterMode(texref, CU_TR_FILTER_MODE_LINEAR);
-        cuTexRefSetAddressMode(texref, 0, CU_TR_ADDRESS_MODE_CLAMP);
-        cuTexRefSetAddressMode(texref, 1, CU_TR_ADDRESS_MODE_CLAMP);
-        cuTexRefSetAddressMode(texref, 2, CU_TR_ADDRESS_MODE_CLAMP);
-        cuTexRefSetFlags(texref, CU_TRSF_NORMALIZED_COORDINATES);
-        cuTexRefSetFormat(texref, CU_AD_FORMAT_FLOAT, 4);
-        cuTexRefSetArray(texref, array, CU_TRSA_OVERRIDE_FORMAT);
+        CUtexref texref = new CUtexref( );
+        cuModuleGetTexRef( texref, module, "texture_float4_3D" );
+        cuTexRefSetFilterMode( texref, CU_TR_FILTER_MODE_LINEAR );
+        cuTexRefSetAddressMode( texref, 0, CU_TR_ADDRESS_MODE_CLAMP );
+        cuTexRefSetAddressMode( texref, 1, CU_TR_ADDRESS_MODE_CLAMP );
+        cuTexRefSetAddressMode( texref, 2, CU_TR_ADDRESS_MODE_CLAMP );
+        cuTexRefSetFlags( texref, CU_TRSF_NORMALIZED_COORDINATES );
+        cuTexRefSetFormat( texref, CU_AD_FORMAT_FLOAT, 4 );
+        cuTexRefSetArray( texref, array, CU_TRSA_OVERRIDE_FORMAT );
 
         // Prepare the output device memory
-        CUdeviceptr dOutput = new CUdeviceptr();
-        cuMemAlloc(dOutput, Sizeof.FLOAT * 4);
+        CUdeviceptr dOutput = new CUdeviceptr( );
+        cuMemAlloc( dOutput, Sizeof.FLOAT * 4 );
 
         // Obtain the test function
-        CUfunction function = new CUfunction();
-        cuModuleGetFunction(function, module, "test_float4_3D");
-        cuFuncSetBlockShape(function, 1, 1, 1);
+        CUfunction function = new CUfunction( );
+        cuModuleGetFunction( function, module, "test_float4_3D" );
+        cuFuncSetBlockShape( function, 1, 1, 1 );
 
         // Set up the function parameters 
-        Pointer pOutput = Pointer.to(dOutput);
-        Pointer pPosX = Pointer.to(new float[]{ posX });
-        Pointer pPosY = Pointer.to(new float[]{ posY });
-        Pointer pPosZ = Pointer.to(new float[]{ posZ });
+        Pointer pOutput = Pointer.to( dOutput );
+        Pointer pPosX = Pointer.to( new float[] { posX } );
+        Pointer pPosY = Pointer.to( new float[] { posY } );
+        Pointer pPosZ = Pointer.to( new float[] { posZ } );
         int offset = 0;
-        offset = align(offset, Sizeof.POINTER);
-        cuParamSetv(function, offset, pOutput, Sizeof.POINTER);
+        offset = align( offset, Sizeof.POINTER );
+        cuParamSetv( function, offset, pOutput, Sizeof.POINTER );
         offset += Sizeof.POINTER;
-        offset = align(offset, Sizeof.FLOAT);
-        cuParamSetv(function, offset, pPosX, Sizeof.FLOAT);
+        offset = align( offset, Sizeof.FLOAT );
+        cuParamSetv( function, offset, pPosX, Sizeof.FLOAT );
         offset += Sizeof.FLOAT;
-        offset = align(offset, Sizeof.FLOAT);
-        cuParamSetv(function, offset, pPosY, Sizeof.FLOAT);
+        offset = align( offset, Sizeof.FLOAT );
+        cuParamSetv( function, offset, pPosY, Sizeof.FLOAT );
         offset += Sizeof.FLOAT;
-        offset = align(offset, Sizeof.FLOAT);
-        cuParamSetv(function, offset, pPosZ, Sizeof.FLOAT);
+        offset = align( offset, Sizeof.FLOAT );
+        cuParamSetv( function, offset, pPosZ, Sizeof.FLOAT );
         offset += Sizeof.FLOAT;
-        cuParamSetSize(function, offset);
+        cuParamSetSize( function, offset );
 
         // Call the function.
-        cuLaunch(function);
-        cuCtxSynchronize();
+        cuLaunch( function );
+        cuCtxSynchronize( );
 
         // Obtain the output on the host
         float hOutput[] = new float[4];
-        cuMemcpyDtoH(Pointer.to(hOutput), dOutput, Sizeof.FLOAT * 4);
+        cuMemcpyDtoH( Pointer.to( hOutput ), dOutput, Sizeof.FLOAT * 4 );
 
         // Print the results
-        System.out.println("Result float4 3D " + Arrays.toString(hOutput));
-        float expected[] = new float[]{ 3.5f, 3.5f, 3.5f, 3.5f };
-        boolean passed = Arrays.equals(hOutput, expected);
-        System.out.println("Test   float4 3D " + 
-            (passed ? "PASSED" : "FAILED"));
+        System.out.println( "Result float4 3D " + Arrays.toString( hOutput ) );
+        float expected[] = new float[] { 3.5f, 3.5f, 3.5f, 3.5f };
+        boolean passed = Arrays.equals( hOutput, expected );
+        System.out.println( "Test   float4 3D " + ( passed ? "PASSED" : "FAILED" ) );
 
         // Clean up
-        cuArrayDestroy(array);
-        cuMemFree(dOutput);
+        cuArrayDestroy( array );
+        cuMemFree( dOutput );
 
         return passed;
     }

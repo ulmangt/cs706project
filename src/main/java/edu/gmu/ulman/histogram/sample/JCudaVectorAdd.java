@@ -132,7 +132,7 @@ public class JCudaVectorAdd
      * @return The name of the PTX file
      * @throws IOException If an I/O error occurs
      */
-    private static String preparePtxFile( String cuFileName ) throws IOException
+    public static String preparePtxFile( String cuFileName ) throws IOException
     {
         int endIndex = cuFileName.lastIndexOf( '.' );
         if ( endIndex == -1 )
@@ -189,7 +189,7 @@ public class JCudaVectorAdd
      * @return The byte array containing the data from the input stream
      * @throws IOException If an I/O error occurs
      */
-    private static byte[] toByteArray( InputStream inputStream ) throws IOException
+    public static byte[] toByteArray( InputStream inputStream ) throws IOException
     {
         ByteArrayOutputStream baos = new ByteArrayOutputStream( );
         byte buffer[] = new byte[8192];
