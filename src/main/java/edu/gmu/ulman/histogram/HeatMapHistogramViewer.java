@@ -26,7 +26,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package edu.gmu.ulman.sample;
+package edu.gmu.ulman.histogram;
 
 import static com.metsci.glimpse.axis.tagged.Tag.TEX_COORD_ATTR;
 

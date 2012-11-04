@@ -1,4 +1,4 @@
-package edu.gmu.ulman.sample;
+package edu.gmu.ulman.histogram.sample;
 
 /*
  * JCuda - Java bindings for NVIDIA CUDA driver and runtime API
