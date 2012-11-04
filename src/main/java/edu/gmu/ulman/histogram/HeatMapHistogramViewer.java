@@ -168,7 +168,7 @@ public class HeatMapHistogramViewer implements GlimpseLayoutProvider
                 double x = w / ( double ) width;
                 double y = h / ( double ) height;
 
-                data[w][h] = y * y + Math.sin( 2 * Math.PI * x * x );
+                data[w][h] = y * y + Math.sin( 2 * Math.PI * x * x ) + Math.random( );
             }
         }
 

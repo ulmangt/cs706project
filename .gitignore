@@ -4,6 +4,7 @@
 .project
 .settings
 
+*.ptx
 *~
 
 # Package Files #

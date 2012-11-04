@@ -127,7 +127,7 @@ public class JCudaDriverTextureTest
         cuCtxCreate( pctx, 0, dev );
 
         // Load the CUBIN file containing the kernels
-        String ptxFileName = PtxUtils.preparePtxFile( "src/main/java/resources/JCudaDriverTextureTestKernels.cu" );
+        String ptxFileName = PtxUtils.preparePtxFile( "src/main/java/resources/sample/JCudaDriverTextureTestKernels.cu" );
         module = new CUmodule( );
         cuModuleLoad( module, ptxFileName );
 
