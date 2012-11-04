@@ -7,25 +7,42 @@ import java.io.IOException;
 import javax.media.opengl.GL;
 import javax.media.opengl.GLContext;
 
+import jcuda.Pointer;
+import jcuda.Sizeof;
 import jcuda.driver.CUarray;
 import jcuda.driver.CUcontext;
 import jcuda.driver.CUdevice;
+import jcuda.driver.CUdeviceptr;
+import jcuda.driver.CUfunction;
 import jcuda.driver.CUgraphicsResource;
 import jcuda.driver.CUmodule;
 import jcuda.driver.CUtexref;
 import jcuda.driver.JCudaDriver;
-import jcuda.runtime.JCuda;
 import jcuda.runtime.cudaGraphicsRegisterFlags;
 import edu.gmu.ulman.histogram.util.PtxUtils;
 
 public class JCudaHistogramCalculator
 {
+    private double minValue;
+    private double maxValue;
+    private int numBins;
+    private int[] hHistogramBins;
+    private CUdeviceptr dHistogramBins;
+
     private CUdevice device;
     private CUcontext context;
     private CUmodule module;
     private CUgraphicsResource gfxResource;
     private CUarray hostArray;
     private CUtexref textureReference;
+    private CUfunction functionTest;
+    
+    public JCudaHistogramCalculator( int numBins, double minValue, double maxValue )
+    {
+        this.numBins = numBins;
+        this.minValue = minValue;
+        this.maxValue = maxValue;
+    }
 
     /**
      * Initialize the CUDA driver.
@@ -64,7 +81,7 @@ public class JCudaHistogramCalculator
         String ptxFileName = PtxUtils.preparePtxFile( "src/main/java/resources/HistogramTextureKernel.cu" );
         module = new CUmodule( );
         cuModuleLoad( module, ptxFileName );
-        
+
         // create a cudaGraphicsResource which allows CUDA kernels to access OpenGL textures
         // http://developer.download.nvidia.com/compute/cuda/4_2/rel/toolkit/docs/online/group__CUDA__TYPES_gc0c4e1704647178d9c5ba3be46517dcd.html
         gfxResource = new CUgraphicsResource( );
@@ -91,8 +108,56 @@ public class JCudaHistogramCalculator
 
         // unbind cuGraphicsResource so that it can be accessed by OpenGL again
         cuGraphicsUnmapResources( 1, new CUgraphicsResource[] { gfxResource }, null );
+
+        
+        // obtain the test function
+        functionTest = new CUfunction( );
+        cuModuleGetFunction( functionTest, module, "test_float_2D" );
+        cuFuncSetBlockShape( functionTest, 1, 1, 1 );
+        
+        // allocate host memory for histogram bins
+        float[] histogramBins = new float[numBins];
+
+        // allocate device pointer with space for all bin values
+        dHistogramBins = new CUdeviceptr( );
+        cuMemAlloc( dHistogramBins, numBins * Sizeof.INT );
+
+        // zero out device memory array
+        cuMemsetD32( dHistogramBins, 0, numBins * Sizeof.INT );
     }
     
+    public void calculateHistogram( )
+    {
+        // set up the function parameters 
+        Pointer pHistogramBins = Pointer.to( dHistogramBins );
+        Pointer pPosX = Pointer.to( new float[] { 0.0f } );
+        Pointer pPosY = Pointer.to( new float[] { 0.0f } );
+        int offset = 0;
+        offset = align( offset, Sizeof.POINTER );
+        cuParamSetv( functionTest, offset, pHistogramBins, Sizeof.POINTER );
+        offset += Sizeof.POINTER;
+        offset = align( offset, Sizeof.FLOAT );
+        cuParamSetv( functionTest, offset, pPosX, Sizeof.FLOAT );
+        offset += Sizeof.FLOAT;
+        offset = align( offset, Sizeof.FLOAT );
+        cuParamSetv( functionTest, offset, pPosY, Sizeof.FLOAT );
+        offset += Sizeof.FLOAT;
+        cuParamSetSize( functionTest, offset );
+        
+        // call the function.
+        cuLaunch( functionTest );
+        cuCtxSynchronize( );
+        
+        // copy the kernel output back to the host
+        cuMemcpyDtoH( Pointer.to( hHistogramBins ), dHistogramBins, Sizeof.FLOAT * numBins );
+        
+        System.out.println( "Kernel Output: ");
+        for ( int i = 0 ; i < numBins ; i++ )
+        {
+            System.out.println( hHistogramBins[i] );
+        }
+    }
+
     public void dispose( GLContext glContext )
     {
         cuArrayDestroy( hostArray );

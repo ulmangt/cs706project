@@ -17,10 +17,18 @@ public class HistogramPainter extends GlimpseDataPainter2D
 
     AccessibleFloatTexture2D texture;
     JCudaHistogramCalculator calculator;
+    
+    private double minValue;
+    private double maxValue;
+    private int numBins;
 
-    public HistogramPainter( AccessibleFloatTexture2D texture )
+    public HistogramPainter( AccessibleFloatTexture2D texture, int numBins, double minValue, double maxValue )
     {
         this.texture = texture;
+        
+        this.numBins = numBins;
+        this.minValue = minValue;
+        this.maxValue = maxValue;
     }
 
     @Override
@@ -33,7 +41,7 @@ public class HistogramPainter extends GlimpseDataPainter2D
             int[] handles = texture.getTextureHandles( );
             if ( handles == null || handles.length == 0 || handles[0] <= 0 ) return;
 
-            calculator = new JCudaHistogramCalculator( );
+            calculator = new JCudaHistogramCalculator( numBins, minValue, maxValue );
 
             try
             {

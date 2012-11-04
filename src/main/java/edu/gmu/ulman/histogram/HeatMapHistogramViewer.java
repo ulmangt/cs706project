@@ -154,7 +154,7 @@ public class HeatMapHistogramViewer implements GlimpseLayoutProvider
         cursorPainter.setTexture( texture );
 
         //XXX temporary test code
-        plot.addPainter( new HistogramPainter( texture ) );
+        plot.addPainter( new HistogramPainter( texture, 10, 0.0, 10.0 ) );
         
         return plot;
     }
