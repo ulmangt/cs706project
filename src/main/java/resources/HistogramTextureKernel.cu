@@ -8,9 +8,21 @@ __global__ void test_float_2D( int *bins, int nbins,
                                float minY, float stepY,
                                float minZ, float maxZ )
 {
+    // use block and thread ids to get texture coordinates for this thread
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     int j = blockIdx.y * blockDim.y + threadIdx.y;
 
+    // convert block/thread ids into texture coordinates
+    float x = minX + stepX * i;
+    float y = minY + stepY * j;
+
+    // perform texture lookup
     float result = tex2D(texture_float_2D, posX, posY);
-    bins[0] = (int) result;
+    
+    float stepZ = ( maxZ - minZ ) / nbins;
+    float fbinIndex = floor( ( result - minZ ) / stepZ );
+    int binIndex = (int) clamp( fbinIndex, 0, nbins-1 );
+    
+    // atomically add one to the bin corresponding to the texture value
+    atomicAdd( bins+binIndex, 1 );
 }

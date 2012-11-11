@@ -43,7 +43,10 @@ public class HistogramPainter extends GlimpseDataPainter2D
             int[] handles = texture.getTextureHandles( );
             if ( handles == null || handles.length == 0 || handles[0] <= 0 ) return;
 
-            calculator = new JCudaHistogramCalculator( numBins, minValue, maxValue );
+            double stepX = 1.0 / texture.getDimensionSize( 0 );
+            double stepY = 1.0 / texture.getDimensionSize( 1 );
+            
+            calculator = new JCudaHistogramCalculator( numBins, minValue, maxValue, stepX, stepY );
 
             try
             {
@@ -78,9 +81,9 @@ public class HistogramPainter extends GlimpseDataPainter2D
                 // get the texture coordinates corresponding to the mouse selection
                 InvertibleProjection invProjection = (InvertibleProjection) projection;
                 float texFracMinX = (float) invProjection.getTextureFractionX( centerMinX, centerMinY );
-                float texFracMaxX = (float) invProjection.getTextureFractionY( centerMaxX, centerMinY );
+                float texFracMaxX = (float) invProjection.getTextureFractionX( centerMaxX, centerMinY );
                 
-                float texFracMinY = (float) invProjection.getTextureFractionX( centerMinX, centerMinY );
+                float texFracMinY = (float) invProjection.getTextureFractionY( centerMinX, centerMinY );
                 float texFracMaxY = (float) invProjection.getTextureFractionY( centerMinX, centerMaxY );
             
                 // run the cuda kernel

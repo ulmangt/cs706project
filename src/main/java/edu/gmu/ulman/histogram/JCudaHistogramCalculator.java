@@ -29,6 +29,9 @@ public class JCudaHistogramCalculator
     private double minValue;
     private double maxValue;
     private int numBins;
+    private double texStepX;
+    private double texStepY;
+    
     private int[] hHistogramBins;
     private CUdeviceptr dHistogramBins;
 
@@ -40,11 +43,23 @@ public class JCudaHistogramCalculator
     private CUtexref textureReference;
     private CUfunction functionTest;
     
-    public JCudaHistogramCalculator( int numBins, double minValue, double maxValue )
+    /**
+     * Calculator responsible for setting up the CUDA histogram calculation.
+     * 
+     * @param numBins the number of histogram bins to use
+     * @param minValue the minimum (left hand edge) histogram bin
+     * @param maxValue the maximum (right hand edge) histogram bin
+     * @param texStepX the x step size in texture coordinates for adjacent texels
+     * @param texStepY the y step size in texture coordinates for adjacent texels
+     */
+    public JCudaHistogramCalculator( int numBins, double minValue, double maxValue, double texStepX, double texStepY )
     {
         this.numBins = numBins;
         this.minValue = minValue;
         this.maxValue = maxValue;
+        
+        this.texStepX = texStepX;
+        this.texStepY = texStepY;
     }
 
     /**
@@ -144,25 +159,30 @@ public class JCudaHistogramCalculator
         // (OpenGL should not access the texture until we unmap)
         //cuGraphicsMapResources( 1, new CUgraphicsResource[] { gfxResource }, null );
         
-        float stepX = ( maxX - minX ) / numBins;
-        float stepY = ( maxY - minY ) / numBins;
-        
         // set up the function parameters 
         Pointer pHistogramBins = Pointer.to( dHistogramBins );
         Pointer pMinX = Pointer.to( new float[] { minX } );
-        Pointer pMaxX = Pointer.to( new float[] { stepX } );
+        Pointer pMaxX = Pointer.to( new float[] { (float) texStepX } );
         Pointer pMinY = Pointer.to( new float[] { minY } );
-        Pointer pMaxY = Pointer.to( new float[] { stepY } );
+        Pointer pMaxY = Pointer.to( new float[] { (float) texStepY } );
         Pointer pMinZ = Pointer.to( new float[] { (float) minValue } );
         Pointer pMaxZ = Pointer.to( new float[] { (float) maxValue } );
         Pointer pNumBins = Pointer.to( new int[] { numBins } );
         Pointer kernelParameters = Pointer.to( pHistogramBins, pNumBins, pMinX, pMaxX, pMinY, pMinY, pMaxY, pMinZ, pMaxZ );
         
-        int numElements = 1;
+        // number of texels in each direction in selected region
+        // one thread will be spawned for each texel
+        int sizeX = (int) Math.floor( ( maxX - minX ) / texStepX );
+        int sizeY = (int) Math.floor( ( maxY - minY ) / texStepY );
+        
         int blockSizeX = 256;
-        int gridSizeX = ( int ) Math.ceil( ( double ) numElements / blockSizeX );
-        cuLaunchKernel( functionTest, gridSizeX, 1, 1, // Grid dimension
-                blockSizeX, 1, 1, // Block dimension
+        int blockSizeY = 256;
+        
+        int gridSizeX = ( int ) Math.ceil( ( double ) sizeX / blockSizeX );
+        int gridSizeY = ( int ) Math.ceil( ( double ) sizeY / blockSizeY );
+        
+        cuLaunchKernel( functionTest, gridSizeX, gridSizeY, 1, // Grid dimension
+                blockSizeX, blockSizeY, 1, // Block dimension
                 0, null, // Shared memory size and stream
                 kernelParameters, null // Kernel- and extra parameters
         );
