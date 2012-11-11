@@ -10,6 +10,8 @@ import javax.media.opengl.GLContext;
 import com.metsci.glimpse.axis.Axis2D;
 import com.metsci.glimpse.context.GlimpseBounds;
 import com.metsci.glimpse.painter.base.GlimpseDataPainter2D;
+import com.metsci.glimpse.support.projection.InvertibleProjection;
+import com.metsci.glimpse.support.projection.Projection;
 
 public class HistogramPainter extends GlimpseDataPainter2D
 {
@@ -56,7 +58,22 @@ public class HistogramPainter extends GlimpseDataPainter2D
 
         if ( calculator != null )
         {
-            calculator.calculateHistogram( );
+            // get the position of the mouse selection in axis coordinates
+            float centerX = (float) axis.getAxisX( ).getSelectionCenter( );
+            float centerY = (float) axis.getAxisY( ).getSelectionCenter( );
+            
+            // get the projection which maps between axis coordinates and texture coordinates
+            Projection projection = texture.getProjection( );
+            if ( projection instanceof InvertibleProjection )
+            {
+                // get the texture coordinates corresponding to the mouse selection
+                InvertibleProjection invProjection = (InvertibleProjection) projection;
+                float texFracX = (float) invProjection.getTextureFractionX( centerX, centerY );
+                float texFracY = (float) invProjection.getTextureFractionY( centerX, centerY );
+            
+                // run the cuda kernel
+                calculator.calculateHistogram( texFracX, texFracY );
+            }
         }
     }
 

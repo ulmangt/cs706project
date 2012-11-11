@@ -106,12 +106,13 @@ public class JCudaHistogramCalculator
         textureReference = new CUtexref( );
         cuModuleGetTexRef( textureReference, module, "texture_float_2D" );
         
-        // set how to interpolate between texture values (linear interpolation)
+        // set how to interpolate between texture values (no linear interpolation)
         // and what to do for texture coordinates outside of texture bounds (clamp)
-        cuTexRefSetFilterMode( textureReference, CU_TR_FILTER_MODE_LINEAR );
+        cuTexRefSetFilterMode( textureReference, CU_TR_FILTER_MODE_POINT );
         cuTexRefSetAddressMode( textureReference, 0, CU_TR_ADDRESS_MODE_CLAMP );
         cuTexRefSetAddressMode( textureReference, 1, CU_TR_ADDRESS_MODE_CLAMP );
         
+        // access the texture using 0.0 to 1.0 normalized texture coordinates
         cuTexRefSetFlags( textureReference, CU_TRSF_NORMALIZED_COORDINATES );
         cuTexRefSetFormat( textureReference, CU_AD_FORMAT_FLOAT, 1 );
 
@@ -125,7 +126,6 @@ public class JCudaHistogramCalculator
         // obtain the test function
         functionTest = new CUfunction( );
         cuModuleGetFunction( functionTest, module, "test_float_2D" );
-        cuFuncSetBlockShape( functionTest, 1, 1, 1 );
         
         // allocate host memory for histogram bins
         hHistogramBins = new int[numBins];
@@ -138,7 +138,7 @@ public class JCudaHistogramCalculator
         cuMemsetD32( dHistogramBins, 0, numBins );
     }
     
-    public void calculateHistogram( )
+    public void calculateHistogram( float texPosX, float texPosY )
     {
         // map the cuGraphicsResource, which makes it accessible to CUDA
         // (OpenGL should not access the texture until we unmap)
@@ -146,27 +146,20 @@ public class JCudaHistogramCalculator
         
         // set up the function parameters 
         Pointer pHistogramBins = Pointer.to( dHistogramBins );
-        Pointer pPosX = Pointer.to( new float[] { 0.5f } );
-        Pointer pPosY = Pointer.to( new float[] { 0.5f } );
+        Pointer pPosX = Pointer.to( new float[] { texPosX } );
+        Pointer pPosY = Pointer.to( new float[] { texPosY } );
         
-        int offset = 0;
+        Pointer kernelParameters = Pointer.to( pHistogramBins, pPosX, pPosY );
         
-        offset = align( offset, Sizeof.POINTER );
-        cuParamSetv( functionTest, offset, pHistogramBins, Sizeof.POINTER );
-        offset += Sizeof.POINTER;
+        int numElements = 1;
+        int blockSizeX = 256;
+        int gridSizeX = ( int ) Math.ceil( ( double ) numElements / blockSizeX );
+        cuLaunchKernel( functionTest, gridSizeX, 1, 1, // Grid dimension
+                blockSizeX, 1, 1, // Block dimension
+                0, null, // Shared memory size and stream
+                kernelParameters, null // Kernel- and extra parameters
+        );
         
-        offset = align( offset, Sizeof.FLOAT );
-        cuParamSetv( functionTest, offset, pPosX, Sizeof.FLOAT );
-        offset += Sizeof.FLOAT;
-        
-        offset = align( offset, Sizeof.FLOAT );
-        cuParamSetv( functionTest, offset, pPosY, Sizeof.FLOAT );
-        offset += Sizeof.FLOAT;
-        
-        cuParamSetSize( functionTest, offset );
-        
-        // call the function.
-        cuLaunch( functionTest );
         cuCtxSynchronize( );
         
         // unbind cuGraphicsResource so that it can be accessed by OpenGL again
