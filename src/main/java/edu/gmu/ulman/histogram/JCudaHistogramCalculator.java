@@ -138,18 +138,25 @@ public class JCudaHistogramCalculator
         cuMemsetD32( dHistogramBins, 0, numBins );
     }
     
-    public void calculateHistogram( float texPosX, float texPosY )
+    public void calculateHistogram( float minX, float maxX, float minY, float maxY )
     {
         // map the cuGraphicsResource, which makes it accessible to CUDA
         // (OpenGL should not access the texture until we unmap)
         //cuGraphicsMapResources( 1, new CUgraphicsResource[] { gfxResource }, null );
         
+        float stepX = ( maxX - minX ) / numBins;
+        float stepY = ( maxY - minY ) / numBins;
+        
         // set up the function parameters 
         Pointer pHistogramBins = Pointer.to( dHistogramBins );
-        Pointer pPosX = Pointer.to( new float[] { texPosX } );
-        Pointer pPosY = Pointer.to( new float[] { texPosY } );
-        
-        Pointer kernelParameters = Pointer.to( pHistogramBins, pPosX, pPosY );
+        Pointer pMinX = Pointer.to( new float[] { minX } );
+        Pointer pMaxX = Pointer.to( new float[] { stepX } );
+        Pointer pMinY = Pointer.to( new float[] { minY } );
+        Pointer pMaxY = Pointer.to( new float[] { stepY } );
+        Pointer pMinZ = Pointer.to( new float[] { (float) minValue } );
+        Pointer pMaxZ = Pointer.to( new float[] { (float) maxValue } );
+        Pointer pNumBins = Pointer.to( new int[] { numBins } );
+        Pointer kernelParameters = Pointer.to( pHistogramBins, pNumBins, pMinX, pMaxX, pMinY, pMinY, pMaxY, pMinZ, pMaxZ );
         
         int numElements = 1;
         int blockSizeX = 256;

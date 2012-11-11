@@ -58,9 +58,18 @@ public class HistogramPainter extends GlimpseDataPainter2D
 
         if ( calculator != null )
         {
-            // get the position of the mouse selection in axis coordinates
             float centerX = (float) axis.getAxisX( ).getSelectionCenter( );
             float centerY = (float) axis.getAxisY( ).getSelectionCenter( );
+            
+            float sizeX = (float) axis.getAxisX( ).getSelectionSize( ) / 2;
+            float sizeY = (float) axis.getAxisY( ).getSelectionSize( ) / 2;
+            
+            // get the position of the mouse selection in axis coordinates
+            float centerMinX = centerX - sizeX;
+            float centerMaxX = centerX + sizeX;
+            
+            float centerMinY = centerY - sizeY;
+            float centerMaxY = centerY + sizeY;
             
             // get the projection which maps between axis coordinates and texture coordinates
             Projection projection = texture.getProjection( );
@@ -68,11 +77,14 @@ public class HistogramPainter extends GlimpseDataPainter2D
             {
                 // get the texture coordinates corresponding to the mouse selection
                 InvertibleProjection invProjection = (InvertibleProjection) projection;
-                float texFracX = (float) invProjection.getTextureFractionX( centerX, centerY );
-                float texFracY = (float) invProjection.getTextureFractionY( centerX, centerY );
+                float texFracMinX = (float) invProjection.getTextureFractionX( centerMinX, centerMinY );
+                float texFracMaxX = (float) invProjection.getTextureFractionY( centerMaxX, centerMinY );
+                
+                float texFracMinY = (float) invProjection.getTextureFractionX( centerMinX, centerMinY );
+                float texFracMaxY = (float) invProjection.getTextureFractionY( centerMinX, centerMaxY );
             
                 // run the cuda kernel
-                calculator.calculateHistogram( texFracX, texFracY );
+                calculator.calculateHistogram( texFracMinX, texFracMaxX, texFracMinY, texFracMaxY );
             }
         }
     }
