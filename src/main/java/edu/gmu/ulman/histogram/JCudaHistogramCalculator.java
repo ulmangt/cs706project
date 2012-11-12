@@ -169,19 +169,20 @@ public class JCudaHistogramCalculator
         Pointer pNumBins = Pointer.to( new int[] { numBins } );
         Pointer pMinX = Pointer.to( new float[] { minX } );
         Pointer pStepX = Pointer.to( new float[] { (float) texStepX } );
-        Pointer pSizeX = Pointer.to( new int[] { sizeX } );
         Pointer pMinY = Pointer.to( new float[] { minY } );
         Pointer pStepY = Pointer.to( new float[] { (float) texStepY } );
-        Pointer pSizeY = Pointer.to( new int[] { sizeY } );
         Pointer pMinZ = Pointer.to( new float[] { (float) minValue } );
         Pointer pMaxZ = Pointer.to( new float[] { (float) maxValue } );
-        Pointer kernelParameters = Pointer.to( pHistogramBins, pNumBins, pMinX, pStepX, pSizeX, pMinY, pStepY, pSizeY, pMinZ, pMaxZ );
+        Pointer kernelParameters = Pointer.to( pHistogramBins, pNumBins, pMinX, pStepX, pMinY, pStepY, pMinZ, pMaxZ );
         
         int blockSizeX = 16;
         int blockSizeY = 16;
         
         int gridSizeX = ( int ) Math.ceil( ( double ) sizeX / blockSizeX );
         int gridSizeY = ( int ) Math.ceil( ( double ) sizeY / blockSizeY );
+        
+        // zero out device memory array
+        cuMemsetD32( dHistogramBins, 0, numBins );
         
         cuLaunchKernel( functionTest, gridSizeX, gridSizeY, 1, // Grid dimension
                 blockSizeX, blockSizeY, 1, // Block dimension
