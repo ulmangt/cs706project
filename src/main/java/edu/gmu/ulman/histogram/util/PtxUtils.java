@@ -34,7 +34,7 @@ public class PtxUtils
      * @return The name of the PTX file
      * @throws IOException If an I/O error occurs
      */
-    public static String preparePtxFile( String cuFileName ) throws IOException
+    public static String preparePtxFile( String cuFileName, boolean forceRecompile ) throws IOException
     {
         int endIndex = cuFileName.lastIndexOf( '.' );
         if ( endIndex == -1 )
@@ -43,7 +43,7 @@ public class PtxUtils
         }
         String ptxFileName = cuFileName.substring( 0, endIndex + 1 ) + "ptx";
         File ptxFile = new File( ptxFileName );
-        if ( ptxFile.exists( ) )
+        if ( ptxFile.exists( ) && !forceRecompile )
         {
             return ptxFileName;
         }
@@ -54,7 +54,7 @@ public class PtxUtils
             throw new IOException( "Input file not found: " + cuFileName );
         }
         String modelString = "-m" + System.getProperty( "sun.arch.data.model" );
-        String command = "nvcc " + modelString + " -ptx " + cuFile.getPath( ) + " -o " + ptxFileName;
+        String command = "nvcc -arch=sm_11 " + modelString + " -ptx " + cuFile.getPath( ) + " -o " + ptxFileName;
 
         System.out.println( "Executing\n" + command );
         Process process = Runtime.getRuntime( ).exec( command );

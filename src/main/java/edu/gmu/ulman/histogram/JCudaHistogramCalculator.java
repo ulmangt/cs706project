@@ -96,7 +96,7 @@ public class JCudaHistogramCalculator
         cuCtxCreate( context, 0, device );
 
         // Load the file containing kernels for calculating histogram values on the GPU into a CUmodule
-        String ptxFileName = PtxUtils.preparePtxFile( "src/main/java/resources/HistogramTextureKernel.cu" );
+        String ptxFileName = PtxUtils.preparePtxFile( "src/main/java/resources/HistogramTextureKernel.cu", true );
         module = new CUmodule( );
         cuModuleLoad( module, ptxFileName );
 
@@ -159,24 +159,26 @@ public class JCudaHistogramCalculator
         // (OpenGL should not access the texture until we unmap)
         //cuGraphicsMapResources( 1, new CUgraphicsResource[] { gfxResource }, null );
         
-        // set up the function parameters 
-        Pointer pHistogramBins = Pointer.to( dHistogramBins );
-        Pointer pMinX = Pointer.to( new float[] { minX } );
-        Pointer pMaxX = Pointer.to( new float[] { (float) texStepX } );
-        Pointer pMinY = Pointer.to( new float[] { minY } );
-        Pointer pMaxY = Pointer.to( new float[] { (float) texStepY } );
-        Pointer pMinZ = Pointer.to( new float[] { (float) minValue } );
-        Pointer pMaxZ = Pointer.to( new float[] { (float) maxValue } );
-        Pointer pNumBins = Pointer.to( new int[] { numBins } );
-        Pointer kernelParameters = Pointer.to( pHistogramBins, pNumBins, pMinX, pMaxX, pMinY, pMinY, pMaxY, pMinZ, pMaxZ );
-        
         // number of texels in each direction in selected region
         // one thread will be spawned for each texel
         int sizeX = (int) Math.floor( ( maxX - minX ) / texStepX );
         int sizeY = (int) Math.floor( ( maxY - minY ) / texStepY );
         
-        int blockSizeX = 256;
-        int blockSizeY = 256;
+        // set up the function parameters 
+        Pointer pHistogramBins = Pointer.to( dHistogramBins );
+        Pointer pNumBins = Pointer.to( new int[] { numBins } );
+        Pointer pMinX = Pointer.to( new float[] { minX } );
+        Pointer pStepX = Pointer.to( new float[] { (float) texStepX } );
+        Pointer pSizeX = Pointer.to( new int[] { sizeX } );
+        Pointer pMinY = Pointer.to( new float[] { minY } );
+        Pointer pStepY = Pointer.to( new float[] { (float) texStepY } );
+        Pointer pSizeY = Pointer.to( new int[] { sizeY } );
+        Pointer pMinZ = Pointer.to( new float[] { (float) minValue } );
+        Pointer pMaxZ = Pointer.to( new float[] { (float) maxValue } );
+        Pointer kernelParameters = Pointer.to( pHistogramBins, pNumBins, pMinX, pStepX, pSizeX, pMinY, pStepY, pSizeY, pMinZ, pMaxZ );
+        
+        int blockSizeX = 16;
+        int blockSizeY = 16;
         
         int gridSizeX = ( int ) Math.ceil( ( double ) sizeX / blockSizeX );
         int gridSizeY = ( int ) Math.ceil( ( double ) sizeY / blockSizeY );

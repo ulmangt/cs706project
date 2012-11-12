@@ -2,6 +2,12 @@
 // cudaReadModeElementType specifies that the returned data value should not be normalized
 texture<float,  2, cudaReadModeElementType> texture_float_2D;
 
+// clamp
+inline __device__ float clamp(float f, float a, float b)
+{
+    return fmaxf(a, fminf(f, b));
+}
+
 extern "C"
 __global__ void test_float_2D( int *bins, int nbins,
                                float minX, float stepX,
@@ -17,7 +23,7 @@ __global__ void test_float_2D( int *bins, int nbins,
     float y = minY + stepY * j;
 
     // perform texture lookup
-    float result = tex2D(texture_float_2D, posX, posY);
+    float result = tex2D(texture_float_2D, x, y);
     
     float stepZ = ( maxZ - minZ ) / nbins;
     float fbinIndex = floor( ( result - minZ ) / stepZ );
