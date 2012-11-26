@@ -162,7 +162,7 @@ public class HeatMapHistogramViewer implements GlimpseLayoutProvider
     /*
      * Generate fake data for the heat map.
      */
-    public double[][] generateData( int width, int height )
+    public static double[][] generateData( int width, int height )
     {
         double[][] data = new double[width][height];
 
