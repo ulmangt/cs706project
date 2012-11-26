@@ -7,12 +7,16 @@ import javax.media.opengl.GLContext;
 import com.metsci.glimpse.canvas.FrameBufferGlimpseCanvas;
 import com.metsci.glimpse.context.GlimpseContext;
 import com.metsci.glimpse.gl.GLSimpleFrameBufferObject;
+import com.metsci.glimpse.gl.Jogular;
 import com.metsci.glimpse.plot.ColorAxisPlot2D;
 
 public class HeatMapHistogramTest
 {
     public static void main( String[] args )
     {
+        // add OpenGL native libraries to java.library.path
+        Jogular.initJogl( );
+        
         // build the GlimpseLayout which contains the heat map and histogram painters
         HeatMapHistogramViewer viewer = new HeatMapHistogramViewer( );
         ColorAxisPlot2D layout = viewer.getLayout( );
@@ -42,36 +46,11 @@ public class HeatMapHistogramTest
         // this also triggers the CUDA histogram calculation
         layout.paintTo( context );
 
-        // unbind the frame buffer, dispose of OpenGL resources
-        // and release the gl context
-        fbo.unbind( glContext );
-        frameBuffer.dispose( );
+        // dispose of OpenGL resources
         layout.dispose( context );
-        glContext.release( );
+        frameBuffer.dispose( );
         
-//        // generate some data to display
-//        double[][] data = HeatMapHistogramViewer.generateData( 1000, 1000 );
-//
-//        // generate a projection indicating how the data should be mapped to plot coordinates
-//        Projection projection = new FlatProjection( 0, 1, 0, 1 );
-//
-//        // create an OpenGL texture wrapper object
-//        AccessibleFloatTexture2D texture = new AccessibleFloatTexture2D( 1000, 1000 );
-//
-//        // load the data and projection into the texture
-//        texture.setProjection( projection );
-//        texture.setData( data );
-//        
-//        
-//        
-//        int[] handles = texture.getTextureHandles( );
-//        if ( handles == null || handles.length == 0 || handles[0] <= 0 ) return;
-//
-//        double stepX = 1.0 / texture.getDimensionSize( 0 );
-//        double stepY = 1.0 / texture.getDimensionSize( 1 );
-//        
-//        JCudaHistogramCalculator calculator = new JCudaHistogramCalculator( 10, -50.0, 200.0, stepX, stepY );
-//        
-//        calculator.initialize( handles[0] );
+        // unbind the frame buffer and release the gl context
+        fbo.unbind( glContext );
     }
 }
