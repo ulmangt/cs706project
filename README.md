@@ -20,11 +20,13 @@ JCUDA interfaces with native CUDA libraries and must also be built from source f
 
 Running Project
 ============
-To run the interactive heat map and histogram application, run: edu.gmu.ulman.histogram.HeatMapHistogramViewer.
+To run the interactive heat map and histogram application in Linux execute the runGUI.sh bash script.
 
-To run the no-GUI test case (for profiling purposes), run: edu.gmu.ulman.histogram.HeatMapHistogramTest.
+To run the no-GUI test case (for profiling purposes) in Linux execute the runTest.sh bash script.
 
 The application requires that CUDA and JCUDA are properly installed on the system. The required OpenGL native libraries are included in the Maven dependencies and will be added to java.library.path automatically. The JCUDA native libraries must be added manually. If running from Eclipse, add the following to the run configuration VM arguments:
 
 * -Djava.library.path=JCuda-All-0.5.0RC-src/lib
+
+Running from Eclipse also requires manually adding the JCUDA dependencies in JCuda-All-0.5.0RC-src/java-lib to the classpath, in addition to the Maven managed dependencies.
 
