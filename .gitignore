@@ -6,8 +6,18 @@
 
 *.ptx
 *~
+*.swp
+
+target
 
 # Package Files #
 *.jar
 *.war
 *.ear
+
+# Latex File #
+*.aux
+*.bbl
+*.blg
+*.log
+*.out
