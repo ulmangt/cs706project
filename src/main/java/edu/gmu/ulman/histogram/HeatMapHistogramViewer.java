@@ -53,6 +53,9 @@ import com.metsci.glimpse.support.projection.Projection;
  */
 public class HeatMapHistogramViewer implements GlimpseLayoutProvider
 {
+    public static int TEXTURE_WIDTH = 4000;
+    public static int TEXTURE_HEIGHT = 4000;
+    
     public static void main( String[] args ) throws Exception
     {
         Example.showWithSwing( new HeatMapHistogramViewer( ) );
@@ -110,13 +113,13 @@ public class HeatMapHistogramViewer implements GlimpseLayoutProvider
         plot.setSelectionSize( 0.1f );
 
         // generate some data to display
-        double[][] data = generateData( 1000, 1000 );
+        double[][] data = generateData( TEXTURE_WIDTH, TEXTURE_HEIGHT );
 
         // generate a projection indicating how the data should be mapped to plot coordinates
         Projection projection = new FlatProjection( 0, 1, 0, 1 );
 
         // create an OpenGL texture wrapper object
-        AccessibleFloatTexture2D texture = new AccessibleFloatTexture2D( 1000, 1000 );
+        AccessibleFloatTexture2D texture = new AccessibleFloatTexture2D( TEXTURE_WIDTH, TEXTURE_HEIGHT );
 
         // load the data and projection into the texture
         texture.setProjection( projection );

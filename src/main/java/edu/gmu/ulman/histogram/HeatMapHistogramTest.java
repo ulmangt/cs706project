@@ -12,6 +12,8 @@ import com.metsci.glimpse.plot.ColorAxisPlot2D;
 
 public class HeatMapHistogramTest
 {
+    public static int NUM_STEPS = 200;
+    
     public static void main( String[] args )
     {
         // add OpenGL native libraries to java.library.path
@@ -20,12 +22,6 @@ public class HeatMapHistogramTest
         // build the GlimpseLayout which contains the heat map and histogram painters
         HeatMapHistogramViewer viewer = new HeatMapHistogramViewer( );
         ColorAxisPlot2D layout = viewer.getLayout( );
-        
-        // set the selected region of the heat map
-        layout.getAxisX( ).setSelectionCenter( 0.5 );
-        layout.getAxisX( ).setSelectionSize( 0.1 );
-        layout.getAxisY( ).setSelectionCenter( 0.5 );
-        layout.getAxisY( ).setSelectionSize( 0.1 );
         
         // create a GlimpseCanvas which renders onto an offscreen OpenGL renderbuffer
         // backed by an OpenGL texture
@@ -37,20 +33,33 @@ public class HeatMapHistogramTest
         GLSimpleFrameBufferObject fbo = frameBuffer.getFrameBuffer( );
         GLContext glContext = context.getGLContext( );
 
-        // make the FrameBufferGlimpseCanvas current and bind it to the GLContext
-        // so that OpenGL drawing operations will draw into the frame buffer
-        glContext.makeCurrent( );
-        fbo.bind( glContext );
+        for ( int i = 0 ; i < NUM_STEPS ; i++ )
+        {
+            // set the selected region of the heat map
+            layout.getAxisX( ).setSelectionCenter( i / (double) NUM_STEPS  );
+            layout.getAxisX( ).setSelectionSize( 0.1 );
+            layout.getAxisY( ).setSelectionCenter( 0.5 );
+            layout.getAxisY( ).setSelectionSize( 0.1 );
+        
+            // make the FrameBufferGlimpseCanvas current and bind it to the GLContext
+            // so that OpenGL drawing operations will draw into the frame buffer
+            glContext.makeCurrent( );
+            fbo.bind( glContext );
+    
+            // paint the provided layout into the frame buffer canvas
+            // this also triggers the CUDA histogram calculation
+            layout.paintTo( context );
+    
+            // unbind the frame buffer and release the gl context
+            fbo.unbind( glContext );
+            glContext.release( );
 
-        // paint the provided layout into the frame buffer canvas
-        // this also triggers the CUDA histogram calculation
-        layout.paintTo( context );
-
+        }
+        
+        
         // dispose of OpenGL resources
+        glContext.makeCurrent( );
         layout.dispose( context );
         frameBuffer.dispose( );
-        
-        // unbind the frame buffer and release the gl context
-        fbo.unbind( glContext );
     }
 }

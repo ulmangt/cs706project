@@ -96,7 +96,7 @@ public class JCudaHistogramCalculator
         cuCtxCreate( context, 0, device );
 
         // Load the file containing kernels for calculating histogram values on the GPU into a CUmodule
-        String ptxFileName = PtxUtils.preparePtxFile( "src/main/java/resources/HistogramTextureKernel.cu", true );
+        String ptxFileName = PtxUtils.preparePtxFile( "src/main/java/resources/HistogramTextureKernel.cu", false );
         module = new CUmodule( );
         cuModuleLoad( module, ptxFileName );
 
