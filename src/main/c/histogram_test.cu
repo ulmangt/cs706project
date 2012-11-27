@@ -5,11 +5,14 @@
 #include <time.h>
 
 #include <GL/glut.h>
+#include <cuda_gl_interop.h>
 
 int textureWidth = 4000;
 int textureHeight = 4000;
 
 GLuint* textureHandles;
+cudaGraphicsResource_t* graphicsResource;
+
 bool initialized = false;
 
 float* imageData;
@@ -57,6 +60,9 @@ void init(void)
     initImageData( imageData );
 
     glTexImage2D( GL_TEXTURE_2D, 0, GL_LUMINANCE32F_ARB, textureWidth, textureHeight, 0, GL_LUMINANCE, GL_FLOAT, imageData );
+
+    graphicsResource = (cudaGraphicsResource_t*) malloc( sizeof( cudaGraphicsResource_t ) );
+    cudaGraphicsGLRegisterImage( graphicsResource, *textureHandles, GL_TEXTURE_2D, cudaGraphicsRegisterFlagsReadOnly );
 }
 
 //Drawing funciton
