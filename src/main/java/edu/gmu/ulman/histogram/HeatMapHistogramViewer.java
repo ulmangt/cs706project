@@ -53,8 +53,8 @@ import com.metsci.glimpse.support.projection.Projection;
  */
 public class HeatMapHistogramViewer implements GlimpseLayoutProvider
 {
-    public static int TEXTURE_WIDTH = 4000;
-    public static int TEXTURE_HEIGHT = 4000;
+    public static int TEXTURE_WIDTH = 1000;
+    public static int TEXTURE_HEIGHT = 1000;
     
     public static void main( String[] args ) throws Exception
     {
