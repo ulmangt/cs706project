@@ -3,7 +3,7 @@ cs706project
 
 JCUDA histogram calculation with Glimpse data visualization.
 
-Compilation
+Java Compilation
 ============
 
 Maven can be used to automatically download dependency jars and compile this project.
@@ -17,6 +17,11 @@ JCUDA interfaces with native CUDA libraries and must also be built from source f
 * export PATH=$PATH:/usr/local/cuda-5.0/bin
 * cmake -G "Unix Makefiles" CmakeLists.txt
 * make
+
+C Compilation
+============
+
+Because of problems encountered running the Nvidia Visual Profiler with JCUDA code, a simple headless C testbed application was created which calls the same kernel as the graphical java application. A makefile is included to compile this application. Running the application requires that /usr/local/cuda/lib64 be added to the LD_LIBRARY_PATH environemnt variable (on Ubuntu Linux).
 
 Running Project
 ============

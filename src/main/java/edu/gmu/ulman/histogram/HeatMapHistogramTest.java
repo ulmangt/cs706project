@@ -32,7 +32,7 @@ public class HeatMapHistogramTest
         GlimpseContext context = frameBuffer.getGlimpseContext( );
         GLSimpleFrameBufferObject fbo = frameBuffer.getFrameBuffer( );
         GLContext glContext = context.getGLContext( );
-
+        
         for ( int i = 0 ; i < NUM_STEPS ; i++ )
         {
             // set the selected region of the heat map
@@ -55,7 +55,6 @@ public class HeatMapHistogramTest
             glContext.release( );
 
         }
-        
         
         // dispose of OpenGL resources
         glContext.makeCurrent( );
