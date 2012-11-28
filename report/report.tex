@@ -1,6 +1,5 @@
 \documentclass{article}
 
-\usepackage{algorithmic}
 \usepackage{amsmath}
 \usepackage{graphicx}
 \usepackage{hyperref}
@@ -18,7 +17,7 @@
 
 \section{Glimpse}\label{glimpse}
 
-Glimpse (\url{http://metsci.github.com/glimpse/}) is a Java library for building 2D data visualization applications which take advantage of GPU hardware, allowing users to rapidly explore large data sets. For example, OpenGL Shader Language (GLSL) is used to dynamically adjust the color scale applied to a 2D heat map like Figure \ref{heatmap}. The underlying data for both the heat map and color scale are stored in OpenGL textures, which allows utilization of the GPU texture cache to speed data lookups.
+Glimpse (\url{http://metsci.github.com/glimpse/}) is a Java library for building 2D data visualization applications which take advantage of GPU hardware, allowing users to rapidly explore large data sets\footnote{I have developed Glimpse as part of my professional work over the past year. The development of the graphics library itself is not part of the scope of this project, only the development, profiling, and debugging of the CUDA histogram calculation kernel and the use of Glimpse to visualize the results. Glimpse is released under the open source BSD licence.}. For example, Glimpse uses OpenGL Shader Language (GLSL) to dynamically adjust the color scale of 2D heat map plots like Figure \ref{heatmap}. The underlying data for both the heat map and color scale are stored in OpenGL textures, which allows utilization of the GPU texture cache to speed data lookups.
 
 \begin{figure}
 \centering
@@ -27,7 +26,9 @@ Glimpse (\url{http://metsci.github.com/glimpse/}) is a Java library for building
 \label{heatmap}
 \end{figure}
 
-While Glimpse supports basic visual effects using OpenGL shaders, more complicated data analysis is more suited for NVIDIA's Compute Unified Device Architecture\cite{cuda-zone} which exposes GPU hardware for general purpose computation. This project uses CUDA to calculate histograms for subsections of a large heat map in real time and display them using Glimpse visualization tools.
+\section{Abstract}\label{abstract}
+
+While Glimpse supports basic visual effects using OpenGL shaders, more complicated data analysis is better suited for NVIDIA's Compute Unified Device Architecture\cite{cuda-zone} which exposes GPU hardware for general purpose computation. This project uses CUDA to calculate histograms for subsections of a large heat map in real time and displays the results using Glimpse visualization tools. Profiling and optimizing CUDA applications is difficult because computations are run on hudreds of cores simultaneously and multiple interdependent concerns including: register usage, memory access patterns, multiple memory spaces (global, constant, and shared memory), to name only a few, make determining performance bottlenecks difficult. Thus, this project also discusses utilization of NVIDIA's Visual Profiler\cite{nvidia-visual-profiler}.
 
 \bibliographystyle{plain}
 \bibliography{report}
