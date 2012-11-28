@@ -21,7 +21,7 @@ Glimpse (\url{http://metsci.github.com/glimpse/}) is a Java library for building
 
 \begin{figure}
 \centering
-\includegraphics[width=1.0\textwidth]{TaggedHeatMapExample.png}
+\includegraphics[width=1.0\textwidth]{screenshots/glimpse/TaggedHeatMapExample.png}
 \caption{Glimpse Heat Map Visualization\cite{glimpse.com}}
 \label{heatmap}
 \end{figure}
@@ -29,6 +29,13 @@ Glimpse (\url{http://metsci.github.com/glimpse/}) is a Java library for building
 \section{Abstract}\label{abstract}
 
 While Glimpse supports basic visual effects using OpenGL shaders, more complicated data analysis is better suited for NVIDIA's Compute Unified Device Architecture\cite{cuda-zone} which exposes GPU hardware for general purpose computation. This project uses CUDA to calculate histograms for subsections of a large heat map in real time and displays the results using Glimpse visualization tools. Profiling and optimizing CUDA applications is difficult because computations are run on hudreds of cores simultaneously and multiple interdependent concerns including: register usage, memory access patterns, multiple memory spaces (global, constant, and shared memory), to name only a few, make determining performance bottlenecks difficult. Thus, this project also discusses utilization of NVIDIA's Visual Profiler\cite{nvidia-visual-profiler}.
+
+\begin{figure}
+\centering
+\includegraphics[width=1.0\textwidth]{screenshots/nvvp/calculateHistogram1_screen1.png}
+\caption{NVIDIA Visual Profiler running on calculateHistogram1 kernel}
+\label{kernel1}
+\end{figure}
 
 \bibliographystyle{plain}
 \bibliography{report}
