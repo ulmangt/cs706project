@@ -7,8 +7,6 @@
 #include <GL/glut.h>
 #include <cuda_gl_interop.h>
 #include <cuda_runtime_api.h>
-#include <helper_functions.h> 
-#include <helper_cuda.h> 
 
 int width = 1000;
 int height = 1000;
@@ -30,10 +28,10 @@ inline __device__ float clamp(float f, float a, float b)
 }
 
 extern "C"
-__global__ void test_float_2D( int *bins, int nbins,
-                               float minX, float stepX,
-                               float minY, float stepY,
-                               float minZ, float maxZ )
+__global__ void calculateHistogram1( int *bins, int nbins,
+                                     float minX, float stepX,
+                                     float minY, float stepY,
+                                     float minZ, float maxZ )
 {
     // use block and thread ids to get texture coordinates for this thread
     int i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -79,8 +77,6 @@ void initImageData( float* data )
 
 void init(int argc, char **argv)
 {
-    int devID = findCudaDevice(argc, (const char **) argv);
-
     // size of texture data
     unsigned int size = width * height * sizeof(float);
 
@@ -92,18 +88,10 @@ void init(int argc, char **argv)
     cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc(32, 0, 0, 0, cudaChannelFormatKindFloat);
 
     // create a CUDA array for accessing texture data
-    checkCudaErrors(cudaMallocArray(&cuArray,
-                                    &channelDesc,
-                                    width,
-                                    height));
+    cudaMallocArray(&cuArray,&channelDesc,width,height);
 
     // copy image data from the host into the CUDA array
-    checkCudaErrors(cudaMemcpyToArray(cuArray,
-                                      0,
-                                      0,
-                                      imageData,
-                                      size,
-                                      cudaMemcpyHostToDevice));
+    cudaMemcpyToArray(cuArray, 0, 0, imageData, size, cudaMemcpyHostToDevice);
 
     // set texture access modes for the CUDA texture variable
     // (clamp access for texture coordinates outside 0 to 1)
@@ -113,7 +101,7 @@ void init(int argc, char **argv)
     texture_float_2D.normalized = true;    // access with normalized texture coordinates
 
     // Bind the array to the texture
-    checkCudaErrors(cudaBindTextureToArray(texture_float_2D, cuArray, channelDesc));
+    cudaBindTextureToArray(texture_float_2D, cuArray, channelDesc);
 
     // Allocate space for histogram bin results
     int sizeBins = sizeof( int ) * numBins;
@@ -138,7 +126,7 @@ void calculateHistogram(void)
     float stepY = 1.0 / height;
     float minZ = -50.0;
     float maxZ = 200.0;
-    test_float_2D<<<dimGrid, dimBlock, 0>>>( dBins, numBins, 0, stepX, 0, stepY, minZ, maxZ );
+    calculateHistogram1<<<dimGrid, dimBlock, 0>>>( dBins, numBins, 0, stepX, 0, stepY, minZ, maxZ );
 
     // copy results back to host
     cudaMemcpy( hBins, dBins, sizeBins, cudaMemcpyDeviceToHost );
@@ -163,8 +151,8 @@ int main(int argc, char **argv)
   free( hBins );
   free( imageData );
 
-  checkCudaErrors(cudaFree(dBins));
-  checkCudaErrors(cudaFreeArray(cuArray));
+  cudaFree(dBins);
+  cudaFreeArray(cuArray);
 
   return 0;
 }
