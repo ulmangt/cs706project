@@ -109,8 +109,10 @@ public class HeatMapHistogramViewer implements GlimpseLayoutProvider
         // lock the aspect ratio of the x and y axis to 1 to 1
         plot.lockAspectRatioXY( 1.0f );
 
-        // set the size of the selection box to 100.0 units
-        plot.setSelectionSize( 0.1f );
+        // set the size of the selection box to 0.1 units
+        plot.setSelectionSize( 1.0f );
+        plot.getAxisX( ).setSelectionCenter( 0.5 );
+        plot.getAxisY( ).setSelectionCenter( 0.5 );
 
         // generate some data to display
         double[][] data = generateData( TEXTURE_WIDTH, TEXTURE_HEIGHT );
@@ -176,7 +178,7 @@ public class HeatMapHistogramViewer implements GlimpseLayoutProvider
                 double x = w / ( double ) width;
                 double y = h / ( double ) height;
 
-                data[w][h] = ( y * y + Math.sin( 2 * Math.PI * x * x ) + Math.random( ) ) * 100;
+                data[w][h] = ( y * y + Math.sin( 2 * Math.PI * x * x ) /*+ Math.random( )*/ ) * 100;
             }
         }
 

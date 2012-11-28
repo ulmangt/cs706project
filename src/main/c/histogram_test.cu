@@ -10,8 +10,8 @@
 #include <helper_functions.h> 
 #include <helper_cuda.h> 
 
-int width = 4000;
-int height = 4000;
+int width = 1000;
+int height = 1000;
 int numBins = 10;
 
 GLuint* textureHandles;
@@ -48,15 +48,19 @@ __global__ void test_float_2D( int *bins, int nbins,
     float x = minX + stepX * i;
     float y = minY + stepY * j;
 
-    // perform texture lookup
-    float result = tex2D(texture_float_2D, x, y);
+    // don't over count if texture coordinates are out of bounds
+    if ( x < 1.0 && y < 1.0 )
+    {
+        // perform texture lookup
+        float result = tex2D(texture_float_2D, x, y);
     
-    float stepZ = ( maxZ - minZ ) / nbins;
-    float fbinIndex = floor( ( result - minZ ) / stepZ );
-    int binIndex = (int) clamp( fbinIndex, 0, nbins-1 );
+        float stepZ = ( maxZ - minZ ) / nbins;
+        float fbinIndex = floor( ( result - minZ ) / stepZ );
+        int binIndex = (int) clamp( fbinIndex, 0, nbins-1 );
     
-    // atomically add one to the bin corresponding to the texture value
-    atomicAdd( bins+binIndex, 1 );
+        // atomically add one to the bin corresponding to the texture value
+        atomicAdd( bins+binIndex, 1 );
+    }
 }
 
 
@@ -66,77 +70,41 @@ void initImageData( float* data )
 {
     int w,h;
 
-    double pi = atan(1) * 4;
+    float pi = atan(1) * 4;
 
     for ( w = 0; w < width; w++ )
     {
         for ( h = 0; h < height; h++ )
         {
-            double x = w / ( double ) width;
-            double y = h / ( double ) height;
+            float x = w / ( float ) width;
+            float y = h / ( float ) height;
 
-            double r = rand() / (double) RAND_MAX;
-            data[h+w*height] = ( y * y + sin( 2 * pi * x * x ) + r ) * 100;
+            float r = rand() / (float) RAND_MAX;
+            data[h+w*height] = 0;//( y * y + sin( 2 * pi * x * x ) + r ) * 100;
         }
     }
 }
 
 void init(void)
 {
-/*
-    glEnable( GL_TEXTURE_2D );
-    glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
-    glEnable( GL_BLEND );
-
-    textureHandles = (GLuint*) malloc( sizeof( GLuint ) );
-
-    glGenTextures( 1, textureHandles );
-
-    glBindTexture( GL_TEXTURE_2D, *textureHandles );
-
-    printf("Texture %d\n", *textureHandles);
-
-    glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
-    glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
-
-    glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP );
-    glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP );
-
-    imageData = (float*) malloc( sizeof( float ) * textureWidth * textureHeight );
-    initImageData( imageData );
-
-    glTexImage2D( GL_TEXTURE_2D, 0, GL_LUMINANCE32F_ARB, textureWidth, textureHeight, 0, GL_LUMINANCE, GL_FLOAT, imageData );
-
-    //graphicsResource = (cudaGraphicsResource_t*) malloc( sizeof( cudaGraphicsResource_t ) );
-    cudaGraphicsGLRegisterImage( graphicsResource, *textureHandles, GL_TEXTURE_2D, cudaGraphicsRegisterFlagsReadOnly );
-
-    cudaGraphicsMapResources( 1, graphicsResource, 0 );
-
-    cudaGraphicsSubResourceGetMappedArray( &array, *graphicsResource, 0, 0 );
-
-    texture_float_2D.addressMode[0] = cudaAddressModeClamp;
-    texture_float_2D.addressMode[1] = cudaAddressModeClamp;
-    texture_float_2D.filterMode = cudaFilterModeLinear;
-    texture_float_2D.normalized = true;
-
-    cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc(32, 0, 0, 0, cudaChannelFormatKindFloat);
-
-    cudaBindTextureToArray( texture_float_2D, array, channelDesc );
-*/
-
+    // size of texture data
     unsigned int size = width * height * sizeof(float);
 
+    // allocate space for texture data and initialize with interesting function
     imageData = (float*) malloc( size );
     initImageData( imageData );
 
+    // set up CUDA texture description (32 bit float)
     cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc(32, 0, 0, 0, cudaChannelFormatKindFloat);
 
+    // create a CUDA array for accessing texture data
     cudaArray *cuArray;
     checkCudaErrors(cudaMallocArray(&cuArray,
                                     &channelDesc,
                                     width,
                                     height));
 
+    // copy image data from the host into the CUDA array
     checkCudaErrors(cudaMemcpyToArray(cuArray,
                                       0,
                                       0,
@@ -144,6 +112,8 @@ void init(void)
                                       size,
                                       cudaMemcpyHostToDevice));
 
+    // set texture access modes for the CUDA texture variable
+    // (clamp access for texture coordinates outside 0 to 1)
     texture_float_2D.addressMode[0] = cudaAddressModeClamp;
     texture_float_2D.addressMode[1] = cudaAddressModeClamp;
     texture_float_2D.filterMode = cudaFilterModeLinear;
@@ -158,13 +128,23 @@ void init(void)
     cudaMalloc( &dBins, sizeBins );
     cudaMemset( dBins, 0, sizeBins );
 
-    dim3 dimBlock(8, 8, 1);
-    dim3 dimGrid(width / dimBlock.x, height / dimBlock.y, 1);
+    // calculate block and grid dimensions
+    dim3 dimBlock( 16, 16, 1);
+    int gridX = ceil( width / (float) dimBlock.x );
+    int gridY = ceil( height / (float) dimBlock.y );
+    dim3 dimGrid( gridX, gridY, 1);
 
-    test_float_2D<<<dimGrid, dimBlock, 0>>>( dBins, numBins, 0, 1.0 / width, 0, 1.0 / height, -50.0, 200.0 );
+    // run the kernel over the whole texture
+    float stepX = 1.0 / width;
+    float stepY = 1.0 / height;
+    float minZ = -50.0;
+    float maxZ = 200.0;
+    test_float_2D<<<dimGrid, dimBlock, 0>>>( dBins, numBins, 0, stepX, 0, stepY, minZ, maxZ );
 
+    // copy results back to host
     cudaMemcpy( hBins, dBins, sizeBins, cudaMemcpyDeviceToHost );
 
+    // print results
     int i;
     for ( i = 0 ; i < numBins ; i++ )
     {
