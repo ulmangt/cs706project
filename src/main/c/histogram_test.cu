@@ -14,13 +14,7 @@ int width = 1000;
 int height = 1000;
 int numBins = 10;
 
-GLuint* textureHandles;
-cudaGraphicsResource_t* graphicsResource;
-cudaArray* array;
-
-bool initialized = false;
-int execCount = 0;
-
+cudaArray *cuArray;
 float* imageData;
 int* dBins;
 int* hBins;
@@ -83,8 +77,10 @@ void initImageData( float* data )
     }
 }
 
-void init(void)
+void init(int argc, char **argv)
 {
+    int devID = findCudaDevice(argc, (const char **) argv);
+
     // size of texture data
     unsigned int size = width * height * sizeof(float);
 
@@ -96,7 +92,6 @@ void init(void)
     cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc(32, 0, 0, 0, cudaChannelFormatKindFloat);
 
     // create a CUDA array for accessing texture data
-    cudaArray *cuArray;
     checkCudaErrors(cudaMallocArray(&cuArray,
                                     &channelDesc,
                                     width,
@@ -156,52 +151,20 @@ void calculateHistogram(void)
     }
 }
 
-//Drawing funciton
-void draw(void)
-{
-  if ( !initialized )
-  {
-    init( );
-    initialized = true;
-  }
-
-  //Background color
-  glClearColor( 0,1,0,1 );
-  glClear( GL_COLOR_BUFFER_BIT );
-
-  if ( execCount < 10 )
-  {
-    calculateHistogram( );
-    execCount++;
-  }
-
-  //Draw order
-  glFlush();
-}
-
-void animate()
-{
-  glutPostRedisplay();
-}
-
 //Main program
 int main(int argc, char **argv)
 {
-  printf("CUDA Histogram Calculator Starting...\n");
+  printf("CUDA Histogram Calculator\n");
 
-  //cutilDeviceInit(argc, argv);
-  glutInit(&argc, argv);
+  init( argc, argv );
 
-  //Simple buffer
-  glutInitDisplayMode( GLUT_SINGLE | GLUT_RGB );
-  glutInitWindowPosition(50,25);
-  glutInitWindowSize(500,250);
-  glutCreateWindow("Green window");
+  calculateHistogram( );
 
-  //Call to the drawing function
-  glutDisplayFunc(draw);
-  glutIdleFunc(animate);
-  glutMainLoop();
+  free( hBins );
+  free( imageData );
+
+  checkCudaErrors(cudaFree(dBins));
+  checkCudaErrors(cudaFreeArray(cuArray));
 
   return 0;
 }
