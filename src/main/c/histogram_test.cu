@@ -19,6 +19,7 @@ cudaGraphicsResource_t* graphicsResource;
 cudaArray* array;
 
 bool initialized = false;
+int execCount = 0;
 
 float* imageData;
 int* dBins;
@@ -63,9 +64,6 @@ __global__ void test_float_2D( int *bins, int nbins,
     }
 }
 
-
-
-
 void initImageData( float* data )
 {
     int w,h;
@@ -80,7 +78,7 @@ void initImageData( float* data )
             float y = h / ( float ) height;
 
             float r = rand() / (float) RAND_MAX;
-            data[h+w*height] = 0;//( y * y + sin( 2 * pi * x * x ) + r ) * 100;
+            data[h+w*height] = ( y * y + sin( 2 * pi * x * x ) + r ) * 100;
         }
     }
 }
@@ -126,6 +124,12 @@ void init(void)
     int sizeBins = sizeof( int ) * numBins;
     hBins = (int*) malloc( sizeBins );
     cudaMalloc( &dBins, sizeBins );
+}
+
+void calculateHistogram(void)
+{
+    int sizeBins = sizeof( int ) * numBins;
+
     cudaMemset( dBins, 0, sizeBins );
 
     // calculate block and grid dimensions
@@ -165,9 +169,19 @@ void draw(void)
   glClearColor( 0,1,0,1 );
   glClear( GL_COLOR_BUFFER_BIT );
 
+  if ( execCount < 10 )
+  {
+    calculateHistogram( );
+    execCount++;
+  }
 
   //Draw order
   glFlush();
+}
+
+void animate()
+{
+  glutPostRedisplay();
 }
 
 //Main program
@@ -186,6 +200,7 @@ int main(int argc, char **argv)
 
   //Call to the drawing function
   glutDisplayFunc(draw);
+  glutIdleFunc(animate);
   glutMainLoop();
 
   return 0;
