@@ -12,6 +12,7 @@
 
 int width = 4000;
 int height = 4000;
+int numBins = 10;
 
 GLuint* textureHandles;
 cudaGraphicsResource_t* graphicsResource;
@@ -20,7 +21,8 @@ cudaArray* array;
 bool initialized = false;
 
 float* imageData;
-
+int* dBins;
+int* hBins;
 
 // a reference to a 2D texture where each texture element contains a 1D float value
 // cudaReadModeElementType specifies that the returned data value should not be normalized
@@ -150,6 +152,24 @@ void init(void)
     // Bind the array to the texture
     checkCudaErrors(cudaBindTextureToArray(texture_float_2D, cuArray, channelDesc));
 
+    // Allocate space for histogram bin results
+    int sizeBins = sizeof( int ) * numBins;
+    hBins = (int*) malloc( sizeBins );
+    cudaMalloc( &dBins, sizeBins );
+    cudaMemset( dBins, 0, sizeBins );
+
+    dim3 dimBlock(8, 8, 1);
+    dim3 dimGrid(width / dimBlock.x, height / dimBlock.y, 1);
+
+    test_float_2D<<<dimGrid, dimBlock, 0>>>( dBins, numBins, 0, 1.0 / width, 0, 1.0 / height, -50.0, 200.0 );
+
+    cudaMemcpy( hBins, dBins, sizeBins, cudaMemcpyDeviceToHost );
+
+    int i;
+    for ( i = 0 ; i < numBins ; i++ )
+    {
+        printf( "%d\n", hBins[i] );
+    }
 }
 
 //Drawing funciton
