@@ -33,20 +33,17 @@ While Glimpse supports basic visual effects using OpenGL shaders, more complicat
 
 The input data to the histogram calculation is a matrix of floating point data values. The output is an array of integers containing the number of matrix values which fall within a set of discrete bins. The matrix data is stored in video memory on graphics card as a two dimensional OpenGL texture. This allows the CUDA histogram calculation kernel to take advantage of specialized caching hardware on the graphics card to speed data access.
 
-\begin{figure}
-\centering
-\includegraphics[width=1.0\textwidth]{screenshots/nvvp/calculateHistogram1_screen1.png}
-\caption{NVIDIA Visual Profiler running on calculateHistogram1 kernel}
-\label{kernel1nvvp1}
-\end{figure}
-
 \section{Approach One}\label{approach1}
 
 CUDA developers write \emph{kernels} which define the behavior of a single logical GPU thread. Threads are grouped into logical \emph{blocks} within which they can share memory and synchronize with one another. They are physically executed on GPU multiprocessors which execute the same instruction on a \emph{warp} of 32 threads simultaneously. Multiprocessor cores have no branch prediction or speculative execution hardware. Instead, they rely on swapping out warps which are blocked on memory access or slow operations to keep the multiprocessor busy. 
 
 Because of this Single Instruction, Multiple Thread (SIMT) data parallel programming model, often the first question which must be asked when designing a CUDA algorithm is how GPU threads will map to data. For the histogram calculation problem, the simplest approach is to simply assign one thread to each matrix/texture element. That thread will determine the appropriate bin for its data value, and increment the bin by one.
 
-Listing \ref{kernel1} contains the kernel which implements this approach. The last \emph{atomicAdd} call is the key line. Each thread, after calculating the bin index for the matrix value it has been assigned, must increment the histogram count array \emph{bins} by 1. However, just like incrementing a shared variable in a multithreaded \emph{c} program, care must be taken that interleaving of machine instructions does not result in lost increments. Fortunately, CUDA makes this very easy with the \emph{atomicAdd} operation\cite{arithmetic-functions}.
+Listing \ref{kernel1} contains the kernel which implements this approach. The last \emph{atomicAdd} call is the key line. Each thread, after calculating the bin index for the matrix value it has been assigned, must increment the histogram count array \emph{bins} by 1. However, just like incrementing a shared variable in a multithreaded \emph{c} program, care must be taken that interleaving of machine instructions does not result in lost increments.
+
+Fortunately, CUDA makes ensuring mutually exclusive access to shared variable easy using the \emph{atomicAdd} operation\cite{arithmetic-functions}. Unfortunately, simplistic use of \emph{atomicAdd} on a variable in \emph{global memory} causes significant performance problems for the \emph{calculateHistogram1} kernel. Figure \ref{kernel1nvvp1} displays an overview screenshot of NVIDIA Visual Profiler (NVVP) results and Figure \ref{kernel1nvvp2} highlights high-level warnings provided by the profiler.
+
+Instruction replays occur when the GPU multiprocessor must serialize instruction execution instead of executing an instruction for all 32 threads of a \emph{warp} simultaneously. This can happen for a number of reasons including divergent branches (different threads within a warp taking different sides of an \emph{if} statement), uncoalesed memory access (threads accessing non-contiguous memory locations), or atomic operations on multiple threads accessing the same memory location. The Visual Profiler indicates that 59.6\% of kernel execution time was taken up by instruction replay.
 
 \lstset{language=C,basicstyle=\footnotesize}
 \begin{minipage}{\textwidth}
@@ -84,10 +81,18 @@ __global__ void calculateHistogram1( int *bins, int nbins,
 
 \begin{figure}
 \centering
+\includegraphics[width=1.0\textwidth]{screenshots/nvvp/calculateHistogram1_screen1.png}
+\caption{NVIDIA Visual Profiler running on calculateHistogram1 kernel}
+\label{kernel1nvvp1}
+\end{figure}
+
+\begin{figure}
+\centering
 \includegraphics[width=1.0\textwidth]{screenshots/nvvp/calculateHistogram1_screen2.png}
 \caption{NVIDIA Visual Profiler Kernel Instruction Analysis}
 \label{kernel1nvvp2}
 \end{figure}
+
 
 \section{Appendix}\label{appendix}
 
