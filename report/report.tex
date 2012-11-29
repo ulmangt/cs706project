@@ -1,5 +1,6 @@
 \documentclass{article}
 
+\usepackage{listings}
 \usepackage{amsmath}
 \usepackage{graphicx}
 \usepackage{hyperref}
@@ -36,6 +37,40 @@ While Glimpse supports basic visual effects using OpenGL shaders, more complicat
 \caption{NVIDIA Visual Profiler running on calculateHistogram1 kernel}
 \label{kernel1}
 \end{figure}
+
+\lstset{language=C,basicstyle=\footnotesize}
+\begin{minipage}{\textwidth}
+\begin{lstlisting}[caption=Global Memory atomicAdd kernel]
+__global__ void calculateHistogram1( int *bins, int nbins,
+                                                float minX, float stepX,
+                                                float minY, float stepY,
+                                                float minZ, float maxZ )
+{
+    // use block and thread ids to get texture coordinates for this thread
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+
+    // convert block/thread ids into texture coordinates
+    float x = minX + stepX * i;
+    float y = minY + stepY * j;
+
+    // don't over count if texture coordinates are out of bounds
+    if ( x < 1.0 && y < 1.0 )
+    {
+        // perform texture lookup
+        float result = tex2D(texture_float_2D, x, y);
+    
+        // calculate bin index
+        float stepZ = ( maxZ - minZ ) / nbins;
+        float fbinIndex = floor( ( result - minZ ) / stepZ );
+        int binIndex = (int) clamp( fbinIndex, 0, nbins-1 );
+    
+        // atomically add one to the bin corresponding to the data value
+        atomicAdd( bins+binIndex, 1 );
+    }
+}
+\end{lstlisting}
+\end{minipage}
 
 \bibliographystyle{plain}
 \bibliography{report}
