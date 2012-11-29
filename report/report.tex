@@ -37,7 +37,7 @@ The input data to the histogram calculation is a matrix of floating point data v
 \centering
 \includegraphics[width=1.0\textwidth]{screenshots/nvvp/calculateHistogram1_screen1.png}
 \caption{NVIDIA Visual Profiler running on calculateHistogram1 kernel}
-\label{kernel1}
+\label{kernel1nvvp1}
 \end{figure}
 
 \section{Approach One}\label{approach1}
@@ -46,9 +46,11 @@ CUDA developers write \emph{kernels} which define the behavior of a single logic
 
 Because of this Single Instruction, Multiple Thread (SIMT) data parallel programming model, often the first question which must be asked when designing a CUDA algorithm is how GPU threads will map to data. For the histogram calculation problem, the simplest approach is to simply assign one thread to each matrix/texture element. That thread will determine the appropriate bin for its data value, and increment the bin by one.
 
+Listing \ref{kernel1} contains the kernel which implements this approach. The last \emph{atomicAdd} call is the key line. Each thread, after calculating the bin index for the matrix value it has been assigned, must increment the histogram count array \emph{bins} by 1. However, just like incrementing a shared variable in a multithreaded \emph{c} program, care must be taken that interleaving of machine instructions does not result in lost increments. Fortunately, CUDA makes this very easy with the \emph{atomicAdd} operation\cite{arithmetic-functions}.
+
 \lstset{language=C,basicstyle=\footnotesize}
 \begin{minipage}{\textwidth}
-\begin{lstlisting}[caption=Global Memory atomicAdd kernel]
+\begin{lstlisting}[caption={Global Memory atomicAdd kernel},label={kernel1}]
 __global__ void calculateHistogram1( int *bins, int nbins,
                                      float minX, float stepX,
                                      float minY, float stepY,
@@ -79,6 +81,13 @@ __global__ void calculateHistogram1( int *bins, int nbins,
 }
 \end{lstlisting}
 \end{minipage}
+
+\begin{figure}
+\centering
+\includegraphics[width=1.0\textwidth]{screenshots/nvvp/calculateHistogram1_screen2.png}
+\caption{NVIDIA Visual Profiler Kernel Instruction Analysis}
+\label{kernel1nvvp2}
+\end{figure}
 
 \bibliographystyle{plain}
 \bibliography{report}
