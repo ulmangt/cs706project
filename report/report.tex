@@ -31,6 +31,8 @@ Glimpse (\url{http://metsci.github.com/glimpse/}) is a Java library for building
 
 While Glimpse supports basic visual effects using OpenGL shaders, more complicated data analysis is better suited for NVIDIA's Compute Unified Device Architecture\cite{cuda-zone} which exposes GPU hardware for general purpose computation. This project uses CUDA to calculate histograms for subsections of a large heat map in real time and displays the results using Glimpse visualization tools. Profiling and optimizing CUDA applications is difficult because computations are run on hudreds of cores simultaneously and multiple interdependent concerns including: register usage, memory access patterns, multiple memory spaces (global, constant, and shared memory), to name only a few, make determining performance bottlenecks difficult. Thus, this project also discusses utilization of NVIDIA's Visual Profiler\cite{nvidia-visual-profiler}.
 
+The input data to the histogram calculation is a matrix of floating point data values. The output is an array of integers containing the number of matrix values which fall within a set of discrete bins. The matrix data is stored in video memory on graphics card as a two dimensional OpenGL texture. This allows the CUDA histogram calculation kernel to take advantage of specialized caching hardware on the graphics card to speed data access.
+
 \begin{figure}
 \centering
 \includegraphics[width=1.0\textwidth]{screenshots/nvvp/calculateHistogram1_screen1.png}
@@ -38,13 +40,19 @@ While Glimpse supports basic visual effects using OpenGL shaders, more complicat
 \label{kernel1}
 \end{figure}
 
+\section{Approach One}\label{approach1}
+
+CUDA developers write \emph{kernels} which define the behavior of a single logical GPU thread. Threads are grouped into logical \emph{blocks} within which they can share memory and synchronize with one another. They are physically executed on GPU multiprocessors which execute the same instruction on a \emph{warp} of 32 threads simultaneously. Multiprocessor cores have no branch prediction or speculative execution hardware. Instead, they rely on swapping out warps which are blocked on memory access or slow operations to keep the multiprocessor busy. 
+
+Because of this Single Instruction, Multiple Thread (SIMT) data parallel programming model, often the first question which must be asked when designing a CUDA algorithm is how GPU threads will map to data. For the histogram calculation problem, the simplest approach is to simply assign one thread to each matrix/texture element. That thread will determine the appropriate bin for its data value, and increment the bin by one.
+
 \lstset{language=C,basicstyle=\footnotesize}
 \begin{minipage}{\textwidth}
 \begin{lstlisting}[caption=Global Memory atomicAdd kernel]
 __global__ void calculateHistogram1( int *bins, int nbins,
-                                                float minX, float stepX,
-                                                float minY, float stepY,
-                                                float minZ, float maxZ )
+                                     float minX, float stepX,
+                                     float minY, float stepY,
+                                     float minZ, float maxZ )
 {
     // use block and thread ids to get texture coordinates for this thread
     int i = blockIdx.x * blockDim.x + threadIdx.x;
