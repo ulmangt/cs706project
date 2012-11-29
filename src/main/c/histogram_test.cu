@@ -27,11 +27,18 @@ inline __device__ float clamp(float f, float a, float b)
     return fmaxf(a, fminf(f, b));
 }
 
-extern "C"
-__global__ void calculateHistogram1( int *bins, int nbins,
-                                     float minX, float stepX,
-                                     float minY, float stepY,
-                                     float minZ, float maxZ )
+// bins     global memory vector to be filled with bin counts
+// nbins    size of bins vector
+// minX     the minimum x texture coordinate
+// stepX    step size in x in texture coordinates
+// minY     the minimum y texture coordinate
+// stepY    step size in y in texture coordinates
+// minZ     data value of the left edge of the left-most bin
+// maxZ     data value of the right edge of the right-most bin
+extern "C" __global__ void calculateHistogram1( int *bins, int nbins,
+                                                float minX, float stepX,
+                                                float minY, float stepY,
+                                                float minZ, float maxZ )
 {
     // use block and thread ids to get texture coordinates for this thread
     int i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -47,11 +54,12 @@ __global__ void calculateHistogram1( int *bins, int nbins,
         // perform texture lookup
         float result = tex2D(texture_float_2D, x, y);
     
+        // calculate bin index
         float stepZ = ( maxZ - minZ ) / nbins;
         float fbinIndex = floor( ( result - minZ ) / stepZ );
         int binIndex = (int) clamp( fbinIndex, 0, nbins-1 );
     
-        // atomically add one to the bin corresponding to the texture value
+        // atomically add one to the bin corresponding to the data value
         atomicAdd( bins+binIndex, 1 );
     }
 }
