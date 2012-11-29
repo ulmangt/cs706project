@@ -1,0 +1,2 @@
+* JCUDA compatibility issues (with NVVP)
+* CUDA GPU hardware and CUDA version issues
