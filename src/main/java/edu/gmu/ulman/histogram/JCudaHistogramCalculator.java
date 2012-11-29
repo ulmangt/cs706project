@@ -153,8 +153,10 @@ public class JCudaHistogramCalculator
         cuMemsetD32( dHistogramBins, 0, numBins );
     }
     
-    public void calculateHistogram( float minX, float maxX, float minY, float maxY )
+    public int[] calculateHistogram( float minX, float maxX, float minY, float maxY )
     {
+        System.out.println( minX + " " + minY + " " + maxX + " " + maxY );
+        
         // map the cuGraphicsResource, which makes it accessible to CUDA
         // (OpenGL should not access the texture until we unmap)
         //cuGraphicsMapResources( 1, new CUgraphicsResource[] { gfxResource }, null );
@@ -198,11 +200,16 @@ public class JCudaHistogramCalculator
         // copy the kernel output back to the host
         cuMemcpyDtoH( Pointer.to( hHistogramBins ), dHistogramBins, Sizeof.INT * numBins );
         
+        int[] hHistogramBins_out = new int[numBins];
+        
         System.out.println( "Kernel Output: ");
         for ( int i = 0 ; i < numBins ; i++ )
         {
             System.out.println( hHistogramBins[i] );
+            hHistogramBins_out[i] = hHistogramBins[i];
         }
+        
+        return hHistogramBins_out;
     }
 
     public void dispose( GLContext glContext )

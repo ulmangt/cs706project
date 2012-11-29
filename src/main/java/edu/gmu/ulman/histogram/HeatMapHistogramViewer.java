@@ -30,12 +30,15 @@ package edu.gmu.ulman.histogram;
 
 import static com.metsci.glimpse.axis.tagged.Tag.*;
 
+import com.metsci.glimpse.axis.Axis2D;
 import com.metsci.glimpse.axis.tagged.NamedConstraint;
 import com.metsci.glimpse.axis.tagged.Tag;
 import com.metsci.glimpse.axis.tagged.TaggedAxis1D;
 import com.metsci.glimpse.examples.Example;
 import com.metsci.glimpse.gl.texture.ColorTexture1D;
+import com.metsci.glimpse.layout.GlimpseAxisLayout2D;
 import com.metsci.glimpse.layout.GlimpseLayoutProvider;
+import com.metsci.glimpse.painter.decoration.BorderPainter;
 import com.metsci.glimpse.painter.info.CursorTextZPainter;
 import com.metsci.glimpse.painter.texture.TaggedHeatMapPainter;
 import com.metsci.glimpse.plot.ColorAxisPlot2D;
@@ -53,8 +56,11 @@ import com.metsci.glimpse.support.projection.Projection;
  */
 public class HeatMapHistogramViewer implements GlimpseLayoutProvider
 {
-    public static int TEXTURE_WIDTH = 1000;
-    public static int TEXTURE_HEIGHT = 1000;
+    public static int TEXTURE_WIDTH = 500;
+    public static int TEXTURE_HEIGHT = 500;
+    
+    public static float MIN_Z = -50.0f;
+    public static float MAX_Z = 200.0f;
     
     public static void main( String[] args ) throws Exception
     {
@@ -110,7 +116,7 @@ public class HeatMapHistogramViewer implements GlimpseLayoutProvider
         plot.lockAspectRatioXY( 1.0f );
 
         // set the size of the selection box to 0.1 units
-        plot.setSelectionSize( 1.0f );
+        plot.setSelectionSize( 0.05f );
         plot.getAxisX( ).setSelectionCenter( 0.5 );
         plot.getAxisY( ).setSelectionCenter( 0.5 );
 
@@ -147,9 +153,6 @@ public class HeatMapHistogramViewer implements GlimpseLayoutProvider
         // load the color map into the plot (so the color scale is displayed on the z axis)
         plot.setColorScale( colors );
 
-        // add the painter to the plot
-        plot.addPainter( heatmap );
-
         // create a painter which displays the cursor position and data value under the cursor
         CursorTextZPainter cursorPainter = new CursorTextZPainter( );
         plot.addPainter( cursorPainter );
@@ -158,8 +161,16 @@ public class HeatMapHistogramViewer implements GlimpseLayoutProvider
         // tell the cursor painter what texture to report data values from
         cursorPainter.setTexture( texture );
 
-        //XXX temporary test code
-        plot.addPainter( new HistogramPainter( texture, 10, -50.0, 200.0 ) );
+        // add a painter to calculate the histogram values using CUDA and display in a subplot
+        Axis2D histogramAxis = new Axis2D( );
+        histogramAxis.set( MIN_Z, MAX_Z, 0.0f, 1.0f );
+        GlimpseAxisLayout2D histogramLayout = new GlimpseAxisLayout2D( histogramAxis );
+        histogramLayout.setLayoutData( "pos 20 20 220 220" );
+        
+        histogramLayout.addPainter( new BorderPainter( ) );
+        histogramLayout.addPainter( new CUDAHistogramPainter( texture, plot.getAxis( ), 10, MIN_Z, MAX_Z ) );
+        
+        plot.getLayoutCenter( ).addLayout( histogramLayout );
         
         return plot;
     }

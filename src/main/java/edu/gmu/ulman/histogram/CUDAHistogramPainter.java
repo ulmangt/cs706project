@@ -2,6 +2,9 @@ package edu.gmu.ulman.histogram;
 
 import static com.metsci.glimpse.util.logging.LoggerUtils.*;
 
+import it.unimi.dsi.fastutil.floats.Float2IntMap;
+import it.unimi.dsi.fastutil.floats.Float2IntOpenHashMap;
+
 import java.util.logging.Logger;
 
 import javax.media.opengl.GL;
@@ -10,27 +13,36 @@ import javax.media.opengl.GLContext;
 import com.metsci.glimpse.axis.Axis2D;
 import com.metsci.glimpse.context.GlimpseBounds;
 import com.metsci.glimpse.painter.base.GlimpseDataPainter2D;
+import com.metsci.glimpse.painter.plot.HistogramPainter;
 import com.metsci.glimpse.support.projection.InvertibleProjection;
 import com.metsci.glimpse.support.projection.Projection;
 
-public class HistogramPainter extends GlimpseDataPainter2D
+public class CUDAHistogramPainter extends GlimpseDataPainter2D
 {
-    private static final Logger logger = Logger.getLogger( HistogramPainter.class.getName( ) );
+    private static final Logger logger = Logger.getLogger( CUDAHistogramPainter.class.getName( ) );
 
     AccessibleFloatTexture2D texture;
     JCudaHistogramCalculator calculator;
+
+    private HistogramPainter delegate;
     
     private double minValue;
     private double maxValue;
     private int numBins;
+    
+    private Axis2D textureAxis;
 
-    public HistogramPainter( AccessibleFloatTexture2D texture, int numBins, double minValue, double maxValue )
+    public CUDAHistogramPainter( AccessibleFloatTexture2D texture, Axis2D textureAxis, int numBins, double minValue, double maxValue )
     {
         this.texture = texture;
         
         this.numBins = numBins;
         this.minValue = minValue;
         this.maxValue = maxValue;
+        
+        this.textureAxis = textureAxis;
+        
+        this.delegate = new HistogramPainter( );
     }
 
     @Override
@@ -61,11 +73,11 @@ public class HistogramPainter extends GlimpseDataPainter2D
 
         if ( calculator != null )
         {
-            float centerX = (float) axis.getAxisX( ).getSelectionCenter( );
-            float centerY = (float) axis.getAxisY( ).getSelectionCenter( );
+            float centerX = (float) textureAxis.getAxisX( ).getSelectionCenter( );
+            float centerY = (float) textureAxis.getAxisY( ).getSelectionCenter( );
             
-            float sizeX = (float) axis.getAxisX( ).getSelectionSize( ) / 2;
-            float sizeY = (float) axis.getAxisY( ).getSelectionSize( ) / 2;
+            float sizeX = (float) textureAxis.getAxisX( ).getSelectionSize( ) / 2;
+            float sizeY = (float) textureAxis.getAxisY( ).getSelectionSize( ) / 2;
             
             // get the position of the mouse selection in axis coordinates
             float centerMinX = centerX - sizeX;
@@ -87,7 +99,24 @@ public class HistogramPainter extends GlimpseDataPainter2D
                 float texFracMaxY = (float) invProjection.getTextureFractionY( centerMinX, centerMaxY );
             
                 // run the cuda kernel
-                calculator.calculateHistogram( texFracMinX, texFracMaxX, texFracMinY, texFracMaxY );
+                int[] bins = calculator.calculateHistogram( texFracMinX, texFracMaxX, texFracMinY, texFracMaxY );
+                
+                Float2IntMap map = new Float2IntOpenHashMap( );
+                
+                float binStep = (float) ( ( maxValue - minValue ) / numBins );
+                int totalSize = 0;
+                
+                for ( int i = 0 ; i <  numBins ; i++ )
+                {
+                    float key = (float) ( minValue + binStep * i );
+                    int value = bins[i];
+                    totalSize += bins[i];
+                    map.put( key, value );
+                }
+                
+                delegate.setData( map, totalSize, binStep );
+                
+                delegate.paintTo( gl, bounds, axis );
             }
         }
     }
