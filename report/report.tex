@@ -82,16 +82,24 @@ Fortunately, CUDA makes ensuring mutually exclusive access to shared variable ea
 \begin{figure}
 \centering
 \includegraphics[width=1.0\textwidth]{screenshots/nvvp/calculateHistogram1_screen1.png}
-\caption{NVIDIA Visual Profiler running on calculateHistogram1 kernel}
+\caption{NVVP calculateHistogram1() Kernel Overview }
 \label{kernel1nvvp1}
 \end{figure}
 
 \begin{figure}
 \centering
 \includegraphics[width=1.0\textwidth]{screenshots/nvvp/calculateHistogram1_screen2.png}
-\caption{NVIDIA Visual Profiler Kernel Instruction Analysis}
+\caption{NVVP calculateHistogram1() Kernel Instruction Analysis}
 \label{kernel1nvvp2}
 \end{figure}
+
+\begin{figure}
+\centering
+\includegraphics[width=0.65\textwidth]{screenshots/nvvp/calculateHistogram1_screen3.png}
+\caption{NVVP calculateHistogram1() Kernel Details}
+\label{kernel1nvvp3}
+\end{figure}
+
 
 Instruction replays occur when the GPU multiprocessor must serialize instruction execution instead of executing an instruction for all 32 threads of a \emph{warp} simultaneously. This can happen for a number of reasons including divergent branches (different threads within a warp taking different sides of an \emph{if} statement), uncoalesed memory access (threads accessing non-contiguous memory locations), or atomic operations on multiple threads accessing the same memory location. The Visual Profiler indicates that 59.6\% of kernel execution time was taken up by instruction replay and the average kernel execution time was 702$\mu$s.
 
@@ -99,9 +107,38 @@ Instruction replays occur when the GPU multiprocessor must serialize instruction
 
 In addition to the instruction replays due to concurrent access of identical memory locations, \emph{calculateHistogram1} forced every thread Test\cite{shared-memory}
 
+\begin{figure}
+\centering
+\includegraphics[width=1.0\textwidth]{screenshots/nvvp/calculateHistogram2_screen1.png}
+\caption{NVVP calculateHistogram2() Kernel Overview }
+\label{kernel2nvvp1}
+\end{figure}
+
+\begin{figure}
+\centering
+\includegraphics[width=0.65\textwidth]{screenshots/nvvp/calculateHistogram2_screen3.png}
+\caption{NVVP calculateHistogram2() Kernel Details}
+\label{kernel2nvvp3}
+\end{figure}
+
+\section{Java Visualization}\label{visualization}
+
+After profiling the CUDA histogram calculation kernel using NVCC a simple C program, a graphical application written in Java was written to produce an interactive visualization of the histogram calculations (the main motivation for performing the histogram calculations quickly was to provide interactive feedback to users). The CUDA kernel was called from Java using JCUDA\cite{jcuda}.
+
+Figure \ref{histogram1} shows the final application. The colors on the heat map plot correspond to data values according to the color scale on the right. The black box indicates the region of the heat map which the user has selected with their mouse. The picture-in-picture histogram plot in the lower left show a histogram of the data values contained within the selected region.
+
+Because compiling and running the project is difficult due to the need to install the CUDA development kit and JCUDA library, a video is available on Vimeo at \url{https://vimeo.com/54574489} or in the downloads section of the project on GitHub at \url{https://github.com/ulmangt/cs706project/downloads}.
+
+\begin{figure}
+\centering
+\includegraphics[width=1.0\textwidth]{screenshots/glimpse/GlimpseHistogramPlot.png}
+\caption{Glimpse Histogram Visualization}
+\label{histogram1}
+\end{figure}
+
 \section{Appendix}\label{appendix}
 
-Full source code for the Java, C, and CUDA portions of this project are available online at \url{https://github.com/ulmangt/cs706project}.
+Full source code for the Java, C, and CUDA portions of this project are available online on GitHub at \url{https://github.com/ulmangt/cs706project}.
 
 \bibliographystyle{plain}
 \bibliography{report}
