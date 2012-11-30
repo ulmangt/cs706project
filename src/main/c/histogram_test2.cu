@@ -49,10 +49,13 @@ extern "C" __global__ void calculateHistogram2( int* bins,
 {
     __shared__ int localBins[numBins];
 
+    // unique index for each thread within its block
     int tid = threadIdx.x + threadIdx.y * blockDim.y;
+
+    // unique index for each block
     int bid = blockIdx.x + blockIdx.y * gridDim.y;
 
-    // use block and thread ids to get texture coordinates for this thread
+    // i and j are indices into the whole texture for this thread
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     int j = blockIdx.y * blockDim.y + threadIdx.y;
 
@@ -65,6 +68,9 @@ extern "C" __global__ void calculateHistogram2( int* bins,
     {
         localBins[tid] = 0;
     }
+
+    // wait for all shared variable bins for this block to be zeroed
+    __syncthreads();
 
     // don't over count if texture coordinates are out of bounds
     if ( x < 1.0 && y < 1.0 )
@@ -80,6 +86,7 @@ extern "C" __global__ void calculateHistogram2( int* bins,
         // atomically add one to the bin corresponding to the data value
         atomicAdd( localBins+binIndex, 1 );
     }
+
 
     // wait for all threads in this block to finish incrementing their bin
     __syncthreads();
@@ -184,20 +191,27 @@ void calculateHistogram(void)
     {
         for ( j = 0 ; j < gridY ; j++ )
         {
-            int bid = i + j * gridY;
+            int sum = 0;
+            int bid = ( i + j * gridY ) * numBins;
             for ( k = 0 ; k < numBins ; k++ )
             {
                 printf( "%d %d %d %d\n", i, j, k, hBins[bid+k] );
+                sum += hBins[bid+k];
                 finalBins[k] += hBins[bid+k];
             }
+            printf( "sum %d\n", sum );
         }
     }
 
     // print results
+    int sum = 0;
     for ( i = 0 ; i < numBins ; i++ )
     {
+        sum += finalBins[i];
         printf( "%d\n", finalBins[i] );
     }
+
+    printf( "sum %d\n", sum );
 }
 
 //Main program

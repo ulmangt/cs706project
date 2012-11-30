@@ -140,11 +140,15 @@ void calculateHistogram(void)
     cudaMemcpy( hBins, dBins, sizeBins, cudaMemcpyDeviceToHost );
 
     // print results
+    int sum = 0;
     int i;
     for ( i = 0 ; i < numBins ; i++ )
     {
+        sum += hBins[i];
         printf( "%d\n", hBins[i] );
     }
+
+    printf( "sum %d\n", sum );
 }
 
 //Main program
