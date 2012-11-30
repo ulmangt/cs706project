@@ -56,16 +56,16 @@ int main(int argc, char **argv)
 
     clock_t start = clock();
 
-    // collate results from each gpu block on cpu
     for ( i = 0 ; i < width * height ; i++ )
     {
+        // retrieve a data value
         float data = imageData[i];
 
-        // calculate bin index
-        float stepZ = ( maxZ - minZ ) / numBins;
+        // calculate histogram bin index for the data value
         float fbinIndex = floor( ( data - minZ ) / stepZ );
         int binIndex = (int) clamp( fbinIndex, 0, numBins-1 );
 
+        // increment the histogram bin
         bins[binIndex] += 1;
     }
 

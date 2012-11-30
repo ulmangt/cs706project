@@ -35,6 +35,31 @@ Glimpse (\url{http://metsci.github.com/glimpse/}) is a Java library for building
 
 While Glimpse supports basic visual effects using OpenGL shaders, more complicated data analysis is better suited for NVIDIA's Compute Unified Device Architecture\cite{cuda-zone} which exposes GPU hardware for general purpose computation.
 
+\section{Single Threaded Baseline}\label{baseline}
+
+A simple \emph{C} program which calculates histogram bins on a single thread on the CPU was used to establish a performance baseline. The histogram calculation is provided in Listing \ref{singlehist1} and the full text of the program is available on GitHub at \url{https://github.com/ulmangt/cs706project/blob/master/src/main/c/histogram_test_nocuda.c}.
+
+The total execution time on an Intel Core i7-980X 3.33GHz processor was approximately 20 milliseconds for a 1000 row by 1000 column matrix.
+
+\lstset{language=C,basicstyle=\footnotesize}
+\begin{minipage}{\textwidth}
+\begin{lstlisting}[caption={Single Threaded Histogram Calculation},label={singlehist1}]
+
+for ( i = 0 ; i < width * height ; i++ )
+{
+    // retrieve a data value
+    float data = imageData[i];
+
+    // calculate histogram bin index for the data value
+    float fbinIndex = floor( ( data - minZ ) / stepZ );
+    int binIndex = (int) clamp( fbinIndex, 0, numBins-1 );
+
+    // increment the histogram bin
+    bins[binIndex] += 1;
+}
+\end{lstlisting}
+\end{minipage}
+
 \section{Approach One}\label{approach1}
 
 CUDA developers write \emph{kernels} which define the behavior of a single logical GPU thread. Threads are grouped into logical \emph{blocks} within which they can share memory and synchronize with one another. They are physically executed on GPU multiprocessors which execute the same instruction on a \emph{warp} of 32 threads simultaneously. Multiprocessor cores have no branch prediction or speculative execution hardware. Instead, they rely on swapping out warps which are blocked on memory access or slow operations to keep the multiprocessor busy. 
