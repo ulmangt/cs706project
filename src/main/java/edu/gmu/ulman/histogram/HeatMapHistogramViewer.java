@@ -153,6 +153,9 @@ public class HeatMapHistogramViewer implements GlimpseLayoutProvider
         // load the color map into the plot (so the color scale is displayed on the z axis)
         plot.setColorScale( colors );
 
+        plot.getCrosshairPainter( ).setHideHorizontalHairs( true );
+        plot.getCrosshairPainter( ).setHideVerticalHairs( true );
+        
         // create a painter which displays the cursor position and data value under the cursor
         CursorTextZPainter cursorPainter = new CursorTextZPainter( );
         plot.addPainter( cursorPainter );
