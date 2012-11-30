@@ -186,22 +186,25 @@ void calculateHistogram(void)
         finalBins[i] = 0;
     }
 
+    clock_t start = clock();
+
     // collate results from each gpu block on cpu
     for ( i = 0 ; i < gridX ; i++ )
     {
         for ( j = 0 ; j < gridY ; j++ )
         {
-            int sum = 0;
             int bid = ( i + j * gridY ) * numBins;
             for ( k = 0 ; k < numBins ; k++ )
             {
-                printf( "%d %d %d %d\n", i, j, k, hBins[bid+k] );
-                sum += hBins[bid+k];
                 finalBins[k] += hBins[bid+k];
             }
-            printf( "sum %d\n", sum );
         }
     }
+
+    // time the cpu step
+    clock_t diff = clock() - start;
+    int msec = diff * 1000 / CLOCKS_PER_SEC;
+    printf( "%d millis\n", msec );
 
     // print results
     int sum = 0;
