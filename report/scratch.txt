@@ -1,0 +1,2 @@
+While Glimpse supports basic visual effects using OpenGL shaders, more complicated data analysis is better suited for NVIDIA's Compute Unified Device Architecture\cite{cuda-zone} which exposes GPU hardware for general purpose computation.
+
