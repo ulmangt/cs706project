@@ -18,13 +18,13 @@
 
 \section{Abstract}\label{abstract}
 
-This project uses CUDA to calculate histograms for subsections of a large heat map in real time and displays the results using Glimpse visualization tools (see Section \ref{glimpse}). Profiling and optimizing CUDA applications is difficult because computations are run on hudreds of cores simultaneously and multiple interdependent concerns including: register usage, memory access patterns, multiple memory spaces (global, constant, and shared memory), to name only a few, make determining performance bottlenecks difficult. Thus, this project also discusses utilization of NVIDIA's Visual Profiler\cite{nvidia-visual-profiler}.
+This project uses NVIDIA's Compute Unified Device Architecture\cite{cuda-zone} (CUDA) to calculate histograms for subsections of a large heat map in real time and displays the results using Glimpse visualization tools (see Section \ref{glimpse}). Profiling and optimizing CUDA applications is difficult because computations are run on hundreds of cores simultaneously. Determining and fixing performance bottlenecks is complicated by multiple interdependent concerns including: fitting kernel register and shared memory usage into available hardware, significant differences in efficient memory access patterns for different memory spaces (global, constant, and shared memory), managing synchronization of hundreds of GPU threads, and generally tight coupling of low-level hardware considerations to algorithm design. Thus, this project also discusses utilization of NVIDIA's Visual Profiler\cite{nvidia-visual-profiler}.
 
-The input data to the histogram calculation is a matrix of floating point data values. The output is an array of integers containing the number of matrix values which fall within a set of discrete bins. The matrix data is stored in video memory on graphics card as a two dimensional OpenGL texture. This allows the CUDA histogram calculation kernel to take advantage of specialized caching hardware on the graphics card to speed data access.
+The input data to the histogram calculation is a matrix of floating point data values. The output is an array of integers containing the number of matrix values which fall within a set of discrete bins. The matrix data is stored in video memory on graphics card as a two dimensional OpenGL texture. This allows the CUDA histogram calculation kernel to take advantage of specialized caching hardware on the graphics card to speed data access. See Figure \ref{histogram1} in Section \ref{visualization} for a visualization and link to a video of the final application.
 
 \section{Glimpse}\label{glimpse}
 
-Glimpse (\url{http://metsci.github.com/glimpse/}) is a Java library for building 2D data visualization applications which take advantage of GPU hardware, allowing users to rapidly explore large data sets\footnote{I have developed Glimpse as part of my professional work over the past year. The development of the graphics library itself is not part of the scope of this project, only the development, profiling, and debugging of the CUDA histogram calculation kernel and the use of Glimpse to visualize the results. Glimpse is released under the open source BSD licence.}. For example, Glimpse uses OpenGL Shader Language (GLSL) to dynamically adjust the color scale of 2D heat map plots like Figure \ref{heatmap}. The underlying data for both the heat map and color scale are stored in OpenGL textures, which allows utilization of the GPU texture cache to speed data lookups.
+Glimpse (\url{http://metsci.github.com/glimpse/}) is a Java library for building 2D data visualization applications which take advantage of GPU hardware, allowing users to rapidly explore large data sets\footnote{I have developed Glimpse as part of my professional work over the past year. The development of the graphics library itself is not part of the scope of this project, only the development, profiling, and debugging of the CUDA histogram calculation kernel and the use of Glimpse to visualize the results. Glimpse is released under the open source BSD license.}. For example, Glimpse uses OpenGL Shader Language (GLSL) to dynamically adjust the color scale of 2D heat map plots like Figure \ref{heatmap}. The underlying data for both the heat map and color scale are stored in OpenGL textures, which allows utilization of the GPU texture cache to speed data lookups. Fortuitously, this also means that texture data displayed by Glimpse is already in video memory and accessible to CUDA kernels like the histogram calculation kernels developed for this project.
 
 \begin{figure}
 \centering
@@ -33,13 +33,11 @@ Glimpse (\url{http://metsci.github.com/glimpse/}) is a Java library for building
 \label{heatmap}
 \end{figure}
 
-While Glimpse supports basic visual effects using OpenGL shaders, more complicated data analysis is better suited for NVIDIA's Compute Unified Device Architecture\cite{cuda-zone} which exposes GPU hardware for general purpose computation.
-
 \section{Single Threaded Baseline}\label{baseline}
 
 A simple \emph{C} program which calculates histogram bins on a single thread on the CPU was used to establish a performance baseline. The histogram calculation is provided in Listing \ref{singlehist1} and the full text of the program is available on GitHub at \url{https://github.com/ulmangt/cs706project/blob/master/src/main/c/histogram_test_nocuda.c}.
 
-The total execution time on an Intel Core i7-980X 3.33GHz processor was approximately 20 milliseconds for a 1000 row by 1000 column matrix.
+The total execution time on an Intel Core i7-980X 3.33\emph{GHz} processor was approximately 20 milliseconds for a 1000 row by 1000 column matrix. GPU profiling was performed with a GeForceGTX 480 with 1535\emph{MB} of global memory, 15 multiprocessors (each with 32 cores for a total of 480 cores), and a 1.40\emph{GHz} clock speed\cite{geforce480}.
 
 \lstset{language=C,basicstyle=\footnotesize}
 \begin{minipage}{\textwidth}
@@ -65,6 +63,89 @@ for ( i = 0 ; i < width * height ; i++ )
 CUDA developers write \emph{kernels} which define the behavior of a single logical GPU thread. Threads are grouped into logical \emph{blocks} within which they can share memory and synchronize with one another. They are physically executed on GPU multiprocessors which execute the same instruction on a \emph{warp} of 32 threads simultaneously. Multiprocessor cores have no branch prediction or speculative execution hardware. Instead, they rely on swapping out warps which are blocked on memory access or slow operations to keep the multiprocessor busy. 
 
 Because of this Single Instruction, Multiple Thread (SIMT) data parallel programming model, often the first question which must be asked when designing a CUDA algorithm is how GPU threads will map to data. For the histogram calculation problem, the simplest approach is to simply assign one thread to each matrix/texture element. That thread will determine the appropriate bin for its data value, and increment the bin by one.
+
+\lstset{language=C,basicstyle=\footnotesize}
+\begin{minipage}{\textwidth}
+\begin{lstlisting}[caption={GPU and CPU Memory Allocation Routine},label={init1}]
+void init(int argc, char **argv)
+{
+    // size of texture data
+    unsigned int size = width * height * sizeof(float);
+
+    // allocate space for texture data and initialize data
+    imageData = (float*) malloc( size );
+    initImageData( imageData );
+
+    // set up CUDA texture description (32 bit float)
+    cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc( 32, 0, 0, 0,
+                                                 cudaChannelFormatKindFloat);
+
+    // create a CUDA array for accessing texture data
+    cudaMallocArray(&cuArray,&channelDesc,width,height);
+
+    // copy image data from the host into the CUDA array
+    cudaMemcpyToArray(cuArray, 0, 0, imageData, size, cudaMemcpyHostToDevice);
+
+    // set texture access modes for the CUDA texture variable
+    // (clamp access for texture coordinates outside 0 to 1)
+    texture_float_2D.addressMode[0] = cudaAddressModeClamp;
+    texture_float_2D.addressMode[1] = cudaAddressModeClamp;
+    texture_float_2D.filterMode = cudaFilterModeLinear;
+    // access with normalized texture coordinates
+    texture_float_2D.normalized = true;
+
+    // Bind the array to the texture
+    cudaBindTextureToArray(texture_float_2D, cuArray, channelDesc);
+
+    // Allocate space for histogram bin results
+    int sizeBins = sizeof( int ) * numBins;
+    hBins = (int*) malloc( sizeBins );
+    cudaMalloc( &dBins, sizeBins );
+}
+\end{lstlisting}
+\end{minipage}
+
+\lstset{language=C,basicstyle=\footnotesize}
+\begin{minipage}{\textwidth}
+\begin{lstlisting}[caption={CUDA Kernel Launch and Result Retrieval Routine},label={calc1}]
+void calculateHistogram(void)
+{
+    int sizeBins = sizeof( int ) * numBins;
+
+    cudaMemset( dBins, 0, sizeBins );
+
+    // calculate block and grid dimensions
+    dim3 dimBlock( 16, 16, 1);
+    int gridX = ceil( width / (float) dimBlock.x );
+    int gridY = ceil( height / (float) dimBlock.y );
+    dim3 dimGrid( gridX, gridY, 1);
+
+    // run the kernel over the whole texture
+    float stepX = 1.0 / width;
+    float stepY = 1.0 / height;
+    float minZ = -50.0;
+    float maxZ = 200.0;
+    calculateHistogram1<<<dimGrid, dimBlock, 0>>>( dBins, numBins,
+                                                   0, stepX,
+                                                   0, stepY,
+                                                   minZ, maxZ );
+
+    // copy results back to host
+    cudaMemcpy( hBins, dBins, sizeBins, cudaMemcpyDeviceToHost );
+
+    // print results
+    int sum = 0;
+    int i;
+    for ( i = 0 ; i < numBins ; i++ )
+    {
+        sum += hBins[i];
+        printf( "%d\n", hBins[i] );
+    }
+
+    printf( "sum %d\n", sum );
+}
+\end{lstlisting}
+\end{minipage}
 
 \lstset{language=C,basicstyle=\footnotesize}
 \begin{minipage}{\textwidth}
@@ -100,7 +181,9 @@ __global__ void calculateHistogram1( int *bins, int nbins,
 \end{lstlisting}
 \end{minipage}
 
-Listing \ref{kernel1} contains the kernel which implements this approach. The last \emph{atomicAdd} call is the key line. Each thread, after calculating the bin index for the matrix value it has been assigned, must increment the histogram count array \emph{bins} by 1. However, just like incrementing a shared variable in a multithreaded \emph{c} program, care must be taken that interleaving of machine instructions does not result in lost increments.
+Listing \ref{kernel1} contains the kernel which implements this approach. The setup code for allocating memory on the CPU and GPU, exeucting the CUDA kernel, and retrieving results is included in Listings \ref{init1} and \ref{calc1}. The full code is also available on GitHub at \url{https://github.com/ulmangt/cs706project/blob/master/src/main/c/histogram_test.cu}.
+
+However, the interesting multi-threaded code is the CUDA kernel in Listing \ref{kernel1} and the last \emph{atomicAdd} call is the key line. Each thread, after calculating the bin index for the matrix value it has been assigned, must increment the histogram count array \emph{bins} by 1. However, just like incrementing a shared variable in a multi-threaded \emph{c} program, care must be taken that interleaving of machine instructions does not result in lost increments.
 
 Fortunately, CUDA makes ensuring mutually exclusive access to shared variable easy using the \emph{atomicAdd} operation\cite{arithmetic-functions}. Unfortunately, simplistic use of \emph{atomicAdd} on a variable in \emph{global memory} causes significant performance problems for the \emph{calculateHistogram1} kernel. Figure \ref{kernel1nvvp1} displays an overview screenshot of NVIDIA Visual Profiler (NVVP) results and Figure \ref{kernel1nvvp2} highlights high-level warnings provided by the profiler.
 
@@ -126,11 +209,76 @@ Fortunately, CUDA makes ensuring mutually exclusive access to shared variable ea
 \end{figure}
 
 
-Instruction replays occur when the GPU multiprocessor must serialize instruction execution instead of executing an instruction for all 32 threads of a \emph{warp} simultaneously. This can happen for a number of reasons including divergent branches (different threads within a warp taking different sides of an \emph{if} statement), uncoalesed memory access (threads accessing non-contiguous memory locations), or atomic operations on multiple threads accessing the same memory location. The Visual Profiler indicates that 59.6\% of kernel execution time was taken up by instruction replay and the average kernel execution time was 702$\mu$s.
+Instruction replays occur when the GPU multiprocessor must serialize instruction execution instead of executing an instruction for all 32 threads of a \emph{warp} simultaneously. This can happen for a number of reasons including divergent branches (different threads within a warp taking different sides of an \emph{if} statement), uncoalesced memory access (threads accessing non-contiguous memory locations), or atomic operations on multiple threads accessing the same memory location. The Visual Profiler indicates that 59.6\% of kernel execution time was taken up by instruction replay and the average kernel execution time was 635$\mu$s.
 
 \section{Approach Two}\label{approach2}
 
-In addition to the instruction replays due to concurrent access of identical memory locations, \emph{calculateHistogram1} forced every thread Test\cite{shared-memory}
+In addition to the instruction replays due to concurrent access of identical memory locations, \emph{calculateHistogram1} the memory being accessed by \emph{atomicAdd} was in global memory. Global GPU memory is large: on the GeForce GTX 480 there is 1.5\emph{GB} of global memory but only 48\emph{KB} of shared memory per block\cite{geforce480}. Global memory also has the advantage of being accessible by all thread blocks in a CUDA kernel, whereas shared memory is local to the threads within a single block. However, loading a value from global memory takes about 400 clock cycles, compared to only 4 clock cycles for shared memory\cite{shared-memory}.
+
+Listing \ref{kernel2} contains a modified histogram calculation kernel which attempts to utilize faster shared memory to speed up the computation. The calculation is similar, except that each block produces its own partial histogram, which must then be combined (this step is fast, and is performed on the CPU for simplicity). However, once a block's partial histogram is built in shared memory, it must still be copied to global memory before it can be moved to the CPU. This requires use of the \emph{\_\_syncthreads()} barrier function, which ensures that all threads \emph{in a block} reach the barrier before proceeding. Without this, we might start to copy histogram bins from shared memory to global memory before all threads had finished updating the shared memory histogram bins.
+
+Unfortunately, the NVVP results in Figure \ref{kernel2nvvp1} indicate that the overall kernel execution time actually increased to 899$\mu$s. The instruction replay overhead which caused performance problems for Listing \ref{kernel1} is gone. The \emph{atomicAdd} operation is still used, but it is now writing into memory for a sub-histogram shared by 256 other threads (the block size used), instead of a single array of global memory shared by the over 1 million threads in all 3969 blocks (one logical thread is created for each matrix element, and the 1000 by 1000 matrix has 1 million elements
+
+\lstset{language=C,basicstyle=\footnotesize}
+\begin{minipage}{\textwidth}
+\begin{lstlisting}[caption={Shared Memory atomicAdd kernel},label={kernel2}]
+extern "C" __global__ void calculateHistogram2( int* bins,
+                                                float minX, float stepX,
+                                                float minY, float stepY,
+                                                float minZ, float maxZ )
+{
+    __shared__ int localBins[numBins];
+
+    // unique index for each thread within its block
+    int tid = threadIdx.x + threadIdx.y * blockDim.y;
+
+    // unique index for each block
+    int bid = blockIdx.x + blockIdx.y * gridDim.y;
+
+    // i and j are indices into the whole texture for this thread
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+
+    // convert block/thread ids into texture coordinates
+    float x = minX + stepX * i;
+    float y = minY + stepY * j;
+
+    // clear the shared memory bins (only the first numBins threads)
+    if ( tid < numBins )
+    {
+        localBins[tid] = 0;
+    }
+
+    // wait for all shared variable bins for this block to be zeroed
+    __syncthreads();
+
+    // don't over count if texture coordinates are out of bounds
+    if ( x < 1.0 && y < 1.0 )
+    {
+        // perform texture lookup
+        float result = tex2D(texture_float_2D, x, y);
+    
+        // calculate bin index
+        float stepZ = ( maxZ - minZ ) / numBins;
+        float fbinIndex = floor( ( result - minZ ) / stepZ );
+        int binIndex = (int) clamp( fbinIndex, 0, numBins-1 );
+    
+        // atomically add one to the bin corresponding to the data value
+        atomicAdd( localBins+binIndex, 1 );
+    }
+
+
+    // wait for all threads in this block to finish incrementing their bin
+    __syncthreads();
+
+    // the first numBins threads each write out one shared bin to global memory
+    if ( tid < numBins )
+    {
+        bins[bid*numBins+tid] = localBins[tid];
+    }
+}
+\end{lstlisting}
+\end{minipage}
 
 \begin{figure}
 \centering
