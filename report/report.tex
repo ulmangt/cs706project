@@ -217,7 +217,9 @@ In addition to the instruction replays due to concurrent access of identical mem
 
 Listing \ref{kernel2} contains a modified histogram calculation kernel which attempts to utilize faster shared memory to speed up the computation. The calculation is similar, except that each block produces its own partial histogram, which must then be combined (this step is fast, and is performed on the CPU for simplicity). However, once a block's partial histogram is built in shared memory, it must still be copied to global memory before it can be moved to the CPU. This requires use of the \emph{\_\_syncthreads()} barrier function, which ensures that all threads \emph{in a block} reach the barrier before proceeding. Without this, we might start to copy histogram bins from shared memory to global memory before all threads had finished updating the shared memory histogram bins.
 
-Unfortunately, the NVVP results in Figure \ref{kernel2nvvp1} indicate that the overall kernel execution time actually increased to 899$\mu$s. The instruction replay overhead which caused performance problems for Listing \ref{kernel1} is gone. The \emph{atomicAdd} operation is still used, but it is now writing into memory for a sub-histogram shared by 256 other threads (the block size used), instead of a single array of global memory shared by the over 1 million threads in all 3969 blocks (one logical thread is created for each matrix element, and the 1000 by 1000 matrix has 1 million elements
+Unfortunately, the NVVP results in Figure \ref{kernel2nvvp1} indicate that the overall kernel execution time actually increased to 899$\mu$s. The instruction replay overhead which caused performance problems for Listing \ref{kernel1} is gone. The \emph{atomicAdd} operation is still used, but it is now writing into memory for a sub-histogram shared by 256 other threads (the block size used), instead of a single array of global memory shared by the over 1 million threads among all 3969 blocks. This results in far less memory contention.
+
+However, the two branches where only a few threads from each block zero out the shared memory bins and copy the shared memory bins back to global memory mean that most threads simply sit idle during those steps. This is reported by the NVVP in Figure \ref{kernel2nvvp3} as high divergent branch overhead.
 
 \lstset{language=C,basicstyle=\footnotesize}
 \begin{minipage}{\textwidth}
@@ -293,6 +295,8 @@ extern "C" __global__ void calculateHistogram2( int* bins,
 \caption{NVVP calculateHistogram2() Kernel Details}
 \label{kernel2nvvp3}
 \end{figure}
+
+\section{Approach Three}\label{approach3}
 
 \section{Java Visualization}\label{visualization}
 
