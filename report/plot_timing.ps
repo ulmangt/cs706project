@@ -1,0 +1,8 @@
+#!/usr/bin/gnuplot -persist
+set xrange [0:3200]
+set yrange [0.02:300]
+set logscale y
+set key bottom right
+set xlabel "Texture Width/Height (pixels)"
+set ylabel "Kernel Runtime (milliseconds)"
+plot 'timing.txt' using 1:($2/1000.0) w l ls 1 title 'kernel1', 'timing.txt' using 1:($3/1000.0)  w l ls 2 title 'kernel2', 'timing.txt' using 1:($4/1000.0)  w l ls 3 title 'kernel3', 'timing.txt' using 1:($5/1000.0)  w l ls 4 title 'serial'

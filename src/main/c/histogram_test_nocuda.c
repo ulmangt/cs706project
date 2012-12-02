@@ -5,8 +5,8 @@
 #include <time.h>
 
 #define numBins 10
-#define width 1000
-#define height 1000
+#define width 3000
+#define height 3000
 
 inline float clamp(float f, float a, float b)
 {
