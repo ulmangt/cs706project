@@ -74,9 +74,10 @@ extern "C" __global__ void calculateHistogram2( int* bins,
     #pragma unroll
     for ( int k = 0 ; k < numBins ; k++ ) 
     {
-        localBins[tid] = 0;
+        localBins[blockSize*k + tid] = 0;
     }
 
+/*
     #pragma unroll
     for ( int di = 0 ; di < dimThreadx ; di++ )
     {
@@ -100,6 +101,7 @@ extern "C" __global__ void calculateHistogram2( int* bins,
             }
         }
     }
+*/
 
     // wait for all threads in this block to finish
     // building their sub-histogram
@@ -110,10 +112,13 @@ extern "C" __global__ void calculateHistogram2( int* bins,
     #pragma unroll
     for ( int offset = blockSize >> 1 ; offset > 0 ; offset = offset >> 1 )
     {
-        #pragma unroll
-        for ( int k = 0 ; k < numBins ; k++ )
+        if ( tid < offset )
         {
-            localBins[blockSize*k+tid] += localBins[blockSize*k+tid+offset];
+        #pragma unroll
+            for ( int k = 0 ; k < numBins ; k++ )
+            {
+                localBins[blockSize*k+tid] += localBins[blockSize*k+tid+offset];
+            }
         }
 
         // synchronize after each tree reduction step
