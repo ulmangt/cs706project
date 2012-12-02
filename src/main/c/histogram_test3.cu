@@ -61,12 +61,8 @@ extern "C" __global__ void calculateHistogram2( int* bins,
     int bid = blockIdx.x + blockIdx.y * gridDim.y;
 
     // i and j are indices into the whole texture for this thread
-    int i = ( blockIdx.x * blockDim.x + threadIdx.x ) * dimThreadx;
-    int j = ( blockIdx.y * blockDim.y + threadIdx.y ) * dimThready;
-
-    // convert block/thread ids into texture coordinates
-    float x = minX + stepX * i;
-    float y = minY + stepY * j;
+    int i = ( threadIdx.x + blockIdx.x * blockDim.x ) * dimThreadx;
+    int j = ( threadIdx.y + blockIdx.y * blockDim.y ) * dimThready;
 
     int blockSize = dimBlockx*dimBlocky;
 
@@ -77,7 +73,6 @@ extern "C" __global__ void calculateHistogram2( int* bins,
         localBins[blockSize*k + tid] = 0;
     }
 
-/*
     #pragma unroll
     for ( int di = 0 ; di < dimThreadx ; di++ )
     {
@@ -88,6 +83,9 @@ extern "C" __global__ void calculateHistogram2( int* bins,
             if ( di + i < width && dj + j < height )
             {
                 // perform texture lookup
+                // convert block/thread ids into texture coordinates
+                float x = minX + stepX * (i+di);
+                float y = minY + stepY * (j+dj);
                 float result = tex2D(texture_float_2D, x, y);
     
                 // calculate bin index
@@ -97,11 +95,11 @@ extern "C" __global__ void calculateHistogram2( int* bins,
     
                 // no need for atomic operations because each thread
                 // is now building its own sub-histogram
-                localBins[blockSize*binIndex + tid] += 1;
+                //localBins[blockSize*binIndex + tid] += 1;
+                localBins[tid] += 1;
             }
         }
     }
-*/
 
     // wait for all threads in this block to finish
     // building their sub-histogram
@@ -114,7 +112,7 @@ extern "C" __global__ void calculateHistogram2( int* bins,
     {
         if ( tid < offset )
         {
-        #pragma unroll
+            #pragma unroll
             for ( int k = 0 ; k < numBins ; k++ )
             {
                 localBins[blockSize*k+tid] += localBins[blockSize*k+tid+offset];
@@ -230,8 +228,10 @@ void calculateHistogram(void)
         for ( j = 0 ; j < gridY ; j++ )
         {
             int bid = ( i + j * gridY ) * numBins;
+            printf( "bid %d\n", i + j * gridY );
             for ( k = 0 ; k < numBins ; k++ )
             {
+                printf( "%d\n", hBins[bid+k] );
                 finalBins[k] += hBins[bid+k];
             }
         }
