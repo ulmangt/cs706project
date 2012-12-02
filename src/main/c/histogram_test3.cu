@@ -95,8 +95,7 @@ extern "C" __global__ void calculateHistogram2( int* bins,
     
                 // no need for atomic operations because each thread
                 // is now building its own sub-histogram
-                //localBins[blockSize*binIndex + tid] += 1;
-                localBins[tid] += 1;
+                localBins[blockSize*binIndex + tid] += 1;
             }
         }
     }
@@ -128,7 +127,7 @@ extern "C" __global__ void calculateHistogram2( int* bins,
     // now write those bins to global memory
     if ( tid < numBins )
     {
-        bins[bid*numBins+tid] = localBins[tid];
+        bins[bid*numBins+tid] = localBins[tid*blockSize];
     }
 }
 
@@ -228,10 +227,8 @@ void calculateHistogram(void)
         for ( j = 0 ; j < gridY ; j++ )
         {
             int bid = ( i + j * gridY ) * numBins;
-            printf( "bid %d\n", i + j * gridY );
             for ( k = 0 ; k < numBins ; k++ )
             {
-                printf( "%d\n", hBins[bid+k] );
                 finalBins[k] += hBins[bid+k];
             }
         }
