@@ -12,8 +12,8 @@
 #define width 1000
 #define height 1000
 
-#define dimBlockx 16
-#define dimBlocky 16
+#define dimBlockx 8
+#define dimBlocky 8
 
 #define dimThreadx 16
 #define dimThready 16
@@ -45,7 +45,7 @@ inline __device__ float clamp(float f, float a, float b)
 // stepY    step size in y in texture coordinates
 // minZ     data value of the left edge of the left-most bin
 // maxZ     data value of the right edge of the right-most bin
-extern "C" __global__ void calculateHistogram2( int* bins,
+extern "C" __global__ void calculateHistogram3( int* bins,
                                                 float minX, float stepX,
                                                 float minY, float stepY,
                                                 float minZ, float maxZ )
@@ -204,7 +204,7 @@ void calculateHistogram(void)
     float stepY = 1.0 / height;
     float minZ = -50.0;
     float maxZ = 200.0;
-    calculateHistogram2<<<dimGrid, dimBlock>>>( dBins, 0, stepX, 0, stepY, minZ, maxZ );
+    calculateHistogram3<<<dimGrid, dimBlock>>>( dBins, 0, stepX, 0, stepY, minZ, maxZ );
 
     // copy results back to host
     cudaMemcpy( hBins, dBins, sizeBins, cudaMemcpyDeviceToHost );
