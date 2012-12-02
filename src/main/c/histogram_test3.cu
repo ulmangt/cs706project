@@ -14,9 +14,18 @@
 
 #define dimBlockx 16
 #define dimBlocky 16
+#define blockSize dimBlockx*dimBlocky
 
 #define dimThreadx 16
 #define dimThready 16
+
+// unique index for each thread within its block
+#define tid (threadIdx.x + threadIdx.y * blockDim.y)
+// unique index for each block
+#define bid (blockIdx.x + blockIdx.y * gridDim.y)
+// i and j are indices into the whole texture for this thread
+#define tidx (( threadIdx.x + blockIdx.x * blockDim.x ) * dimThreadx)
+#define tidy (( threadIdx.y + blockIdx.y * blockDim.y ) * dimThready)
 
 cudaArray *cuArray;
 float* imageData;
@@ -26,6 +35,12 @@ int* hBins;
 int gridX;
 int gridY;
 int sizeBins;
+
+// constant memory
+__constant__ int* bins;
+__constant__ float minZ;
+__constant__ float maxZ;
+__constant__ float stepZ;
 
 // a reference to a 2D texture where each texture element contains a 1D float value
 // cudaReadModeElementType specifies that the returned data value should not be normalized
@@ -45,53 +60,36 @@ inline __device__ float clamp(float f, float a, float b)
 // stepY    step size in y in texture coordinates
 // minZ     data value of the left edge of the left-most bin
 // maxZ     data value of the right edge of the right-most bin
-extern "C" __global__ void calculateHistogram2( int* bins,
-                                                float minX, float stepX,
-                                                float minY, float stepY,
-                                                float minZ, float maxZ )
+extern "C" __global__ void calculateHistogram2( float minX, float stepX,
+                                                float minY, float stepY )
 {
     // allocate enough shared memory for each thread to
     // have its own set of histogram bins
     __shared__ int localBins[numBins*dimBlockx*dimBlocky];
 
-    // unique index for each thread within its block
-    int tid = threadIdx.x + threadIdx.y * blockDim.y;
-
-    // unique index for each block
-    int bid = blockIdx.x + blockIdx.y * gridDim.y;
-
-    // i and j are indices into the whole texture for this thread
-    int i = ( threadIdx.x + blockIdx.x * blockDim.x ) * dimThreadx;
-    int j = ( threadIdx.y + blockIdx.y * blockDim.y ) * dimThready;
-
-    int blockSize = dimBlockx*dimBlocky;
-
     // clear the shared memory bins (only the first numBins threads)
-    #pragma unroll
-    for ( int k = 0 ; k < numBins ; k++ ) 
+    int k;
+    for ( k = 0 ; k < numBins ; k++ ) 
     {
-        localBins[blockSize*k + tid] = 0;
+        localBins[dimBlockx*dimBlocky*k + tid] = 0;
     }
 
-    #pragma unroll
-    for ( int di = 0 ; di < dimThreadx ; di++ )
+    for ( int dx = 0 ; dx < dimThreadx ; dx++ )
     {
-        #pragma unroll
-        for ( int dj = 0 ; dj < dimThready ; dj++ )
+        for ( int dy = 0 ; dy < dimThready ; dy++ )
         {
             // don't over count if texture coordinates are out of bounds
-            if ( di + i < width && dj + j < height )
+            if ( dx + tidx < width && dy + tidy < height )
             {
                 // perform texture lookup
                 // convert block/thread ids into texture coordinates
-                float x = minX + stepX * (i+di);
-                float y = minY + stepY * (j+dj);
+                float x = minX + stepX * (tidx+dx);
+                float y = minY + stepY * (tidy+dy);
                 float result = tex2D(texture_float_2D, x, y);
     
                 // calculate bin index
-                float stepZ = ( maxZ - minZ ) / numBins;
                 float fbinIndex = floor( ( result - minZ ) / stepZ );
-                int binIndex = (int) clamp( fbinIndex, 0, numBins-1 );
+                int binIndex = (int) clamp( floor( ( result - minZ ) / stepZ ), 0, numBins-1 );
     
                 // no need for atomic operations because each thread
                 // is now building its own sub-histogram
@@ -106,13 +104,11 @@ extern "C" __global__ void calculateHistogram2( int* bins,
 
     // perform a tree reduction to combine the
     // sub-histograms on each thread into a single block-histogram
-    #pragma unroll
     for ( int offset = blockSize >> 1 ; offset > 0 ; offset = offset >> 1 )
     {
         if ( tid < offset )
         {
-            #pragma unroll
-            for ( int k = 0 ; k < numBins ; k++ )
+            for ( k = 0 ; k < numBins ; k++ )
             {
                 localBins[blockSize*k+tid] += localBins[blockSize*k+tid+offset];
             }
@@ -187,6 +183,15 @@ void init(int argc, char **argv)
     sizeBins = sizeof( int ) * numBins * gridX * gridY;
     hBins = (int*) malloc( sizeBins );
     cudaMalloc( &dBins, sizeBins );
+
+    // copy constants to symbol/constant gpu memory
+    float hminZ = -50.0;
+    float hmaxZ = 200.0;
+    float hstepZ = ( hmaxZ - hminZ ) / numBins;
+    cudaMemcpyToSymbol( minZ, &hminZ, sizeof( float ) );
+    cudaMemcpyToSymbol( maxZ, &hmaxZ, sizeof( float ) );
+    cudaMemcpyToSymbol( stepZ, &hstepZ, sizeof( float ) );
+    cudaMemcpyToSymbol( bins, &dBins, sizeof( int* ) ); 
 }
 
 void calculateHistogram(void)
@@ -204,9 +209,7 @@ void calculateHistogram(void)
     // run the kernel over the whole texture
     float stepX = 1.0 / width;
     float stepY = 1.0 / height;
-    float minZ = -50.0;
-    float maxZ = 200.0;
-    calculateHistogram2<<<dimGrid, dimBlock>>>( dBins, 0, stepX, 0, stepY, minZ, maxZ );
+    calculateHistogram2<<<dimGrid, dimBlock>>>( 0, stepX, 0, stepY );
 
     // copy results back to host
     cudaMemcpy( hBins, dBins, sizeBins, cudaMemcpyDeviceToHost );
@@ -226,10 +229,10 @@ void calculateHistogram(void)
     {
         for ( j = 0 ; j < gridY ; j++ )
         {
-            int bid = ( i + j * gridY ) * numBins;
+            int block_id = ( i + j * gridY ) * numBins;
             for ( k = 0 ; k < numBins ; k++ )
             {
-                finalBins[k] += hBins[bid+k];
+                finalBins[k] += hBins[block_id+k];
             }
         }
     }

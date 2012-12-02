@@ -33,5 +33,11 @@ histogram_test3: histogram_test3.o
 histogram_test3.o:
 	nvcc $(INCLUDES) $(GENCODE_FLAGS) $(LIBS) -c src/main/c/histogram_test3.cu -o target/c/histogram_test3.o
 
+histogram_test3.ptx:
+	cd target/c; nvcc $(INCLUDES) -arch=compute_20 -code=sm_20 $(LIBS) -ptx ../../src/main/c/histogram_test3.cu
+
+histogram_test3.ptxas: histogram_test3.ptx
+	ptxas -arch=compute_20 -v target/c/histogram_test3.ptx
+
 clean:
-	rm -f target/c/histogram_test.o target/c/histogram_test target/c/histogram_test2.o target/c/histogram_test2 target/c/histogram_test3.o target/c/histogram_test3 target/c/histogram_test_nocuda.o target/c/histogram_test_nocuda
+	rm -f target/c/histogram_test.o target/c/histogram_test target/c/histogram_test2.o target/c/histogram_test2 target/c/histogram_test3.o target/c/histogram_test3 target/c/histogram_test3.ptx target/c/histogram_test_nocuda.o target/c/histogram_test_nocuda
