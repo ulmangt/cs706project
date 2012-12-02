@@ -1,2 +1,6 @@
 While Glimpse supports basic visual effects using OpenGL shaders, more complicated data analysis is better suited for NVIDIA's Compute Unified Device Architecture\cite{cuda-zone} which exposes GPU hardware for general purpose computation.
 
+        // once offset is under 32 (and thus all threads involved in the
+        // reduction fit within a single warp) the __syncthreads()
+        // calls are no longer necessary and we can save time by manually
+        // unrolling the remainder of the loop
