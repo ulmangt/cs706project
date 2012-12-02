@@ -50,11 +50,9 @@ extern "C" __global__ void calculateHistogram2( int* bins,
                                                 float minY, float stepY,
                                                 float minZ, float maxZ )
 {
-    int blockSize = dimBlockx*dimBlocky;
-
     // allocate enough shared memory for each thread to
     // have its own set of histogram bins
-    __shared__ int localBins[numBins*blockSize];
+    __shared__ int localBins[numBins*dimBlockx*dimBlocky];
 
     // unique index for each thread within its block
     int tid = threadIdx.x + threadIdx.y * blockDim.y;
@@ -70,6 +68,8 @@ extern "C" __global__ void calculateHistogram2( int* bins,
     float x = minX + stepX * i;
     float y = minY + stepY * j;
 
+    int blockSize = dimBlockx*dimBlocky;
+
     // clear the shared memory bins (only the first numBins threads)
     #pragma unroll
     for ( int k = 0 ; k < numBins ; k++ ) 
@@ -84,7 +84,7 @@ extern "C" __global__ void calculateHistogram2( int* bins,
         for ( int dj = 0 ; dj < dimThready ; dj++ )
         {
             // don't over count if texture coordinates are out of bounds
-            if ( di + i < width && dj + j < heigh )
+            if ( di + i < width && dj + j < height )
             {
                 // perform texture lookup
                 float result = tex2D(texture_float_2D, x, y);
@@ -108,7 +108,7 @@ extern "C" __global__ void calculateHistogram2( int* bins,
     // perform a tree reduction to combine the
     // sub-histograms on each thread into a single block-histogram
     #pragma unroll
-    for ( int offset = blockSize >> 1 ; offset > 0 ; offset >> 1 )
+    for ( int offset = blockSize >> 1 ; offset > 0 ; offset = offset >> 1 )
     {
         #pragma unroll
         for ( int k = 0 ; k < numBins ; k++ )
@@ -177,8 +177,8 @@ void init(int argc, char **argv)
     cudaBindTextureToArray(texture_float_2D, cuArray, channelDesc);
     
     // calculate block and grid dimensions
-    gridX = ceil( width / (float) dimBlockx );
-    gridY = ceil( height / (float) dimBlocky );
+    gridX = ceil( width / (float) (dimBlockx*dimThreadx) );
+    gridY = ceil( height / (float) (dimBlocky*dimThready) );
 
     // allocate space for histogram bin results
     // we allocate a set of bins *for each block*
