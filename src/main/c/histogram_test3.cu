@@ -12,8 +12,8 @@
 #define width 1000
 #define height 1000
 
-#define dimBlockx 8
-#define dimBlocky 8
+#define dimBlockx 16
+#define dimBlocky 16
 
 #define dimThreadx 16
 #define dimThready 16
