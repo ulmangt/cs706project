@@ -42,9 +42,8 @@ The total execution time on an Intel Core i7-980X 3.33\emph{GHz} processor was a
 \lstset{language=C,basicstyle=\footnotesize}
 \begin{minipage}{\textwidth}
 \begin{lstlisting}[caption={Single Threaded Histogram Calculation},label={singlehist1}]
-
-for ( i = 0 ; i < width * height ; i++ )
-{
+  for ( i = 0 ; i < width * height ; i++ )
+  {
     // retrieve a data value
     float data = imageData[i];
 
@@ -54,7 +53,7 @@ for ( i = 0 ; i < width * height ; i++ )
 
     // increment the histogram bin
     bins[binIndex] += 1;
-}
+  }
 \end{lstlisting}
 \end{minipage}
 
@@ -66,124 +65,39 @@ Because of this Single Instruction, Multiple Thread (SIMT) data parallel program
 
 \lstset{language=C,basicstyle=\footnotesize}
 \begin{minipage}{\textwidth}
-\begin{lstlisting}[caption={GPU and CPU Memory Allocation Routine},label={init1}]
-void init(int argc, char **argv)
+\begin{lstlisting}[caption={calculateHistogram1: Global Memory atomicAdd},label={kernel1}]
+extern "C" __global__ void calculateHistogram1( int *bins, int nbins,
+                                                float minX, float stepX,
+                                                float minY, float stepY,
+                                                float minZ, float maxZ )
 {
-    // size of texture data
-    unsigned int size = width * height * sizeof(float);
+  // use block and thread ids to get texture coordinates for this thread
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  int j = blockIdx.y * blockDim.y + threadIdx.y;
 
-    // allocate space for texture data and initialize data
-    imageData = (float*) malloc( size );
-    initImageData( imageData );
+  // convert block/thread ids into texture coordinates
+  float x = minX + stepX * i;
+  float y = minY + stepY * j;
 
-    // set up CUDA texture description (32 bit float)
-    cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc( 32, 0, 0, 0,
-                                                 cudaChannelFormatKindFloat);
+  // don't over count if texture coordinates are out of bounds
+  if ( x < 1.0 && y < 1.0 )
+  {
+    // perform texture lookup
+    float result = tex2D(texture_float_2D, x, y);
 
-    // create a CUDA array for accessing texture data
-    cudaMallocArray(&cuArray,&channelDesc,width,height);
+    // calculate bin index
+    float stepZ = ( maxZ - minZ ) / nbins;
+    float fbinIndex = floor( ( result - minZ ) / stepZ );
+    int binIndex = (int) clamp( fbinIndex, 0, nbins-1 );
 
-    // copy image data from the host into the CUDA array
-    cudaMemcpyToArray(cuArray, 0, 0, imageData, size, cudaMemcpyHostToDevice);
-
-    // set texture access modes for the CUDA texture variable
-    // (clamp access for texture coordinates outside 0 to 1)
-    texture_float_2D.addressMode[0] = cudaAddressModeClamp;
-    texture_float_2D.addressMode[1] = cudaAddressModeClamp;
-    texture_float_2D.filterMode = cudaFilterModeLinear;
-    // access with normalized texture coordinates
-    texture_float_2D.normalized = true;
-
-    // Bind the array to the texture
-    cudaBindTextureToArray(texture_float_2D, cuArray, channelDesc);
-
-    // Allocate space for histogram bin results
-    int sizeBins = sizeof( int ) * numBins;
-    hBins = (int*) malloc( sizeBins );
-    cudaMalloc( &dBins, sizeBins );
+    // atomically add one to the bin corresponding to the data value
+    atomicAdd( bins+binIndex, 1 );
+  }
 }
 \end{lstlisting}
 \end{minipage}
 
-\lstset{language=C,basicstyle=\footnotesize}
-\begin{minipage}{\textwidth}
-\begin{lstlisting}[caption={CUDA Kernel Launch and Result Retrieval Routine},label={calc1}]
-void calculateHistogram(void)
-{
-    int sizeBins = sizeof( int ) * numBins;
-
-    cudaMemset( dBins, 0, sizeBins );
-
-    // calculate block and grid dimensions
-    dim3 dimBlock( 16, 16, 1);
-    int gridX = ceil( width / (float) dimBlock.x );
-    int gridY = ceil( height / (float) dimBlock.y );
-    dim3 dimGrid( gridX, gridY, 1);
-
-    // run the kernel over the whole texture
-    float stepX = 1.0 / width;
-    float stepY = 1.0 / height;
-    float minZ = -50.0;
-    float maxZ = 200.0;
-    calculateHistogram1<<<dimGrid, dimBlock, 0>>>( dBins, numBins,
-                                                   0, stepX,
-                                                   0, stepY,
-                                                   minZ, maxZ );
-
-    // copy results back to host
-    cudaMemcpy( hBins, dBins, sizeBins, cudaMemcpyDeviceToHost );
-
-    // print results
-    int sum = 0;
-    int i;
-    for ( i = 0 ; i < numBins ; i++ )
-    {
-        sum += hBins[i];
-        printf( "%d\n", hBins[i] );
-    }
-
-    printf( "sum %d\n", sum );
-}
-\end{lstlisting}
-\end{minipage}
-
-\lstset{language=C,basicstyle=\footnotesize}
-\begin{minipage}{\textwidth}
-\begin{lstlisting}[caption={Global Memory atomicAdd kernel},label={kernel1}]
-__global__ void calculateHistogram1( int *bins, int nbins,
-                                     float minX, float stepX,
-                                     float minY, float stepY,
-                                     float minZ, float maxZ )
-{
-    // use block and thread ids to get texture coordinates for this thread
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    int j = blockIdx.y * blockDim.y + threadIdx.y;
-
-    // convert block/thread ids into texture coordinates
-    float x = minX + stepX * i;
-    float y = minY + stepY * j;
-
-    // don't over count if texture coordinates are out of bounds
-    if ( x < 1.0 && y < 1.0 )
-    {
-        // perform texture lookup
-        float result = tex2D(texture_float_2D, x, y);
-    
-        // calculate bin index
-        float stepZ = ( maxZ - minZ ) / nbins;
-        float fbinIndex = floor( ( result - minZ ) / stepZ );
-        int binIndex = (int) clamp( fbinIndex, 0, nbins-1 );
-    
-        // atomically add one to the bin corresponding to the data value
-        atomicAdd( bins+binIndex, 1 );
-    }
-}
-\end{lstlisting}
-\end{minipage}
-
-Listing \ref{kernel1} contains the kernel which implements this approach. The setup code for allocating memory on the CPU and GPU, exeucting the CUDA kernel, and retrieving results is included in Listings \ref{init1} and \ref{calc1}. The full code is also available on GitHub at \url{https://github.com/ulmangt/cs706project/blob/master/src/main/c/histogram_test.cu}.
-
-However, the interesting multi-threaded code is the CUDA kernel in Listing \ref{kernel1} and the last \emph{atomicAdd} call is the key line. Each thread, after calculating the bin index for the matrix value it has been assigned, must increment the histogram count array \emph{bins} by 1. However, just like incrementing a shared variable in a multi-threaded \emph{c} program, care must be taken that interleaving of machine instructions does not result in lost increments.
+Listing \ref{kernel1} contains the kernel which implements this approach. The full code is also available on GitHub at \url{https://github.com/ulmangt/cs706project/blob/master/src/main/c/histogram_test.cu}. The key line in the CUDA kernel in Listing \ref{kernel1} is the \emph{atomicAdd} call. Each thread, after calculating the bin index for the matrix value it has been assigned, must increment the histogram count array \emph{bins} by 1. However, just like incrementing a shared variable in a multi-threaded \emph{c} program, care must be taken that interleaving of machine instructions does not result in lost increments.
 
 Fortunately, CUDA makes ensuring mutually exclusive access to shared variable easy using the \emph{atomicAdd} operation\cite{arithmetic-functions}. Unfortunately, simplistic use of \emph{atomicAdd} on a variable in \emph{global memory} causes significant performance problems for the \emph{calculateHistogram1} kernel. Figure \ref{kernel1nvvp1} displays an overview screenshot of NVIDIA Visual Profiler (NVVP) results and Figure \ref{kernel1nvvp2} highlights high-level warnings provided by the profiler.
 
@@ -209,7 +123,7 @@ Fortunately, CUDA makes ensuring mutually exclusive access to shared variable ea
 \end{figure}
 
 
-Instruction replays occur when the GPU multiprocessor must serialize instruction execution instead of executing an instruction for all 32 threads of a \emph{warp} simultaneously. This can happen for a number of reasons including divergent branches (different threads within a warp taking different sides of an \emph{if} statement), uncoalesced memory access (threads accessing non-contiguous memory locations), or atomic operations on multiple threads accessing the same memory location. The Visual Profiler indicates that 59.6\% of kernel execution time was taken up by instruction replay and the average kernel execution time was 635$\mu$s.
+Instruction replays occur when the GPU multiprocessor must serialize instruction execution instead of executing an instruction for all 32 threads of a \emph{warp} simultaneously. This can happen for a number of reasons including divergent branches (different threads within a warp taking different sides of an \emph{if} statement), uncoalesced memory access (threads accessing non-contiguous memory locations), or atomic operations on multiple threads accessing the same memory location. The Visual Profiler indicates that 59.6\% of kernel execution time was taken up by instruction replay and the average kernel execution time was 6248$\mu$s for a 1000 by 1000 pixel element matrix.
 
 \section{Approach Two}\label{approach2}
 
@@ -217,67 +131,66 @@ In addition to the instruction replays due to concurrent access of identical mem
 
 Listing \ref{kernel2} contains a modified histogram calculation kernel which attempts to utilize faster shared memory to speed up the computation. The calculation is similar, except that each block produces its own partial histogram, which must then be combined (this step is fast, and is performed on the CPU for simplicity). However, once a block's partial histogram is built in shared memory, it must still be copied to global memory before it can be moved to the CPU. This requires use of the \emph{\_\_syncthreads()} barrier function, which ensures that all threads \emph{in a block} reach the barrier before proceeding. Without this, we might start to copy histogram bins from shared memory to global memory before all threads had finished updating the shared memory histogram bins.
 
-Unfortunately, the NVVP results in Figure \ref{kernel2nvvp1} indicate that the overall kernel execution time actually increased to 899$\mu$s. The instruction replay overhead which caused performance problems for Listing \ref{kernel1} is gone. The \emph{atomicAdd} operation is still used, but it is now writing into memory for a sub-histogram shared by 256 other threads (the block size used), instead of a single array of global memory shared by the over 1 million threads among all 3969 blocks. This results in far less memory contention.
-
-However, the two branches where only a few threads from each block zero out the shared memory bins and copy the shared memory bins back to global memory mean that most threads simply sit idle during those steps. This is reported by the NVVP in Figure \ref{kernel2nvvp3} as high divergent branch overhead.
+The NVVP results in Figure \ref{kernel2nvvp1} indicate that the overall kernel execution time for this approach decreased to 899$\mu$s. The instruction replay overhead which caused performance problems for Listing \ref{kernel1} is gone. The \emph{atomicAdd} operation is still used, but it is now writing into memory for a sub-histogram shared by 256 other threads (the block size used), instead of a single array of global memory shared by the over 1 million threads among all 3969 blocks. This results in far less memory contention. However, the two branches where only a few threads from each block zero out the shared memory bins and copy the shared memory bins back to global memory mean that most threads simply sit idle during those steps. This is reported by the NVVP in Figure \ref{kernel2nvvp3} as high divergent branch overhead.
 
 \lstset{language=C,basicstyle=\footnotesize}
 \begin{minipage}{\textwidth}
-\begin{lstlisting}[caption={Shared Memory atomicAdd kernel},label={kernel2}]
-extern "C" __global__ void calculateHistogram2( int* bins,
-                                                float minX, float stepX,
-                                                float minY, float stepY,
-                                                float minZ, float maxZ )
+\begin{lstlisting}[caption={calculateHistogram2: Shared Memory atomicAdd},label={kernel2}]
+extern "C" __global__ void calculateHistogram2(
+                                        int* bins,
+                                        float minX, float stepX,
+                                        float minY, float stepY,
+                                        float minZ, float maxZ )
 {
-    __shared__ int localBins[numBins];
+  __shared__ int localBins[numBins];
 
-    // unique index for each thread within its block
-    int tid = threadIdx.x + threadIdx.y * blockDim.y;
+  // unique index for each thread within its block
+  int tid = threadIdx.x + threadIdx.y * blockDim.y;
 
-    // unique index for each block
-    int bid = blockIdx.x + blockIdx.y * gridDim.y;
+  // unique index for each block
+  int bid = blockIdx.x + blockIdx.y * gridDim.y;
 
-    // i and j are indices into the whole texture for this thread
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    int j = blockIdx.y * blockDim.y + threadIdx.y;
+  // i and j are indices into the whole texture for this thread
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  int j = blockIdx.y * blockDim.y + threadIdx.y;
 
-    // convert block/thread ids into texture coordinates
-    float x = minX + stepX * i;
-    float y = minY + stepY * j;
+  // convert block/thread ids into texture coordinates
+  float x = minX + stepX * i;
+  float y = minY + stepY * j;
 
-    // clear the shared memory bins (only the first numBins threads)
-    if ( tid < numBins )
-    {
-        localBins[tid] = 0;
-    }
+  // clear the shared memory bins (only the first numBins threads)
+  if ( tid < numBins )
+  {
+    localBins[tid] = 0;
+  }
 
-    // wait for all shared variable bins for this block to be zeroed
-    __syncthreads();
+  // wait for all shared variable bins for this block to be zeroed
+  __syncthreads();
 
-    // don't over count if texture coordinates are out of bounds
-    if ( x < 1.0 && y < 1.0 )
-    {
-        // perform texture lookup
-        float result = tex2D(texture_float_2D, x, y);
-    
-        // calculate bin index
-        float stepZ = ( maxZ - minZ ) / numBins;
-        float fbinIndex = floor( ( result - minZ ) / stepZ );
-        int binIndex = (int) clamp( fbinIndex, 0, numBins-1 );
-    
-        // atomically add one to the bin corresponding to the data value
-        atomicAdd( localBins+binIndex, 1 );
-    }
+  // don't over count if texture coordinates are out of bounds
+  if ( x < 1.0 && y < 1.0 )
+  {
+    // perform texture lookup
+    float result = tex2D(texture_float_2D, x, y);
+
+    // calculate bin index
+    float stepZ = ( maxZ - minZ ) / numBins;
+    float fbinIndex = floor( ( result - minZ ) / stepZ );
+    int binIndex = (int) clamp( fbinIndex, 0, numBins-1 );
+
+    // atomically add one to the bin corresponding to the data value
+    atomicAdd( localBins+binIndex, 1 );
+  }
 
 
-    // wait for all threads in this block to finish incrementing their bin
-    __syncthreads();
+  // wait for all threads in this block to finish incrementing their bin
+  __syncthreads();
 
-    // the first numBins threads each write out one shared bin to global memory
-    if ( tid < numBins )
-    {
-        bins[bid*numBins+tid] = localBins[tid];
-    }
+  // the first numBins threads each write out one shared bin to global memory
+  if ( tid < numBins )
+  {
+    bins[bid*numBins+tid] = localBins[tid];
+  }
 }
 \end{lstlisting}
 \end{minipage}
@@ -285,7 +198,7 @@ extern "C" __global__ void calculateHistogram2( int* bins,
 \begin{figure}
 \centering
 \includegraphics[width=1.0\textwidth]{screenshots/nvvp/calculateHistogram2_screen1.png}
-\caption{NVVP calculateHistogram2() Kernel Overview }
+\caption{NVVP calculateHistogram2() Kernel Overview}
 \label{kernel2nvvp1}
 \end{figure}
 
@@ -297,6 +210,118 @@ extern "C" __global__ void calculateHistogram2( int* bins,
 \end{figure}
 
 \section{Approach Three}\label{approach3}
+
+The third approach considered, Listing \ref{kernel3},
+
+\begin{figure}
+\centering
+\includegraphics[width=0.65\textwidth]{screenshots/nvvp/calculateHistogram3_screen3.png}
+\caption{NVVP calculateHistogram3() Kernel Overview}
+\label{kernel3nvvp3}
+\end{figure}
+
+\begin{figure}
+\centering
+\includegraphics[width=0.65\textwidth]{screenshots/nvvp/calculateHistogram3_screen4.png}
+\caption{NVVP calculateHistogram3() Kernel Details}
+\label{kernel3nvvp4}
+\end{figure}
+
+\begin{figure}
+\centering
+\includegraphics[width=0.65\textwidth]{screenshots/performance.png}
+\caption{Kernel Performance Comparison}
+\label{comparison1}
+\end{figure}
+
+\lstset{language=C,basicstyle=\footnotesize}
+\begin{lstlisting}[caption={calculateHistogram3: Per-Thread Sub-Histograms},label={kernel3}]
+extern "C" __global__ void calculateHistogram3(
+                                  int* bins,
+                                  float minX, float stepX,
+                                  float minY, float stepY,
+                                  float minZ, float maxZ )
+{
+  // allocate enough shared memory for each thread to
+  // have its own set of histogram bins
+  __shared__ int localBins[numBins*dimBlockx*dimBlocky];
+
+  // unique index for each thread within its block
+  int tid = threadIdx.x + threadIdx.y * blockDim.x;
+
+  // unique index for each block
+  int bid = blockIdx.x + blockIdx.y * gridDim.x;
+
+  // i and j are indices into the whole texture for this thread
+  int i = ( threadIdx.x + blockIdx.x * blockDim.y ) * dimThreadx;
+  int j = ( threadIdx.y + blockIdx.y * blockDim.x ) * dimThready;
+
+  int blockSize = dimBlockx*dimBlocky;
+
+  // clear the shared memory bins (only the first numBins threads)
+  #pragma unroll
+  for ( int k = 0 ; k < numBins ; k++ ) 
+  {
+    localBins[blockSize*k + tid] = 0;
+  }
+
+  #pragma unroll
+  for ( int di = 0 ; di < dimThreadx ; di++ )
+  {
+  #pragma unroll
+    for ( int dj = 0 ; dj < dimThready ; dj++ )
+    {
+      // don't over count if texture coordinates are out of bounds
+      if ( di + i < width && dj + j < height )
+      {
+        // perform texture lookup
+        // convert block/thread ids into texture coordinates
+        float x = minX + stepX * (i+di);
+        float y = minY + stepY * (j+dj);
+        float result = tex2D(texture_float_2D, x, y);
+
+        // calculate bin index
+        float stepZ = ( maxZ - minZ ) / numBins;
+        float fbinIndex = floor( ( result - minZ ) / stepZ );
+        int binIndex = (int) clamp( fbinIndex, 0, numBins-1 );
+
+        // no need for atomic operations because each thread
+        // is now building its own sub-histogram
+        localBins[blockSize*binIndex + tid] += 1;
+      }
+    }
+  }
+
+  // wait for all threads in this block to finish
+  // building their sub-histogram
+  __syncthreads();
+
+  // perform a tree reduction to combine the
+  // sub-histograms on each thread into a single block-histogram
+  for ( unsigned int offset = blockSize >> 1; offset > 0; offset = offset >> 1 )
+  {
+    if ( tid < offset )
+    {
+      for ( int k = 0 ; k < numBins ; k++ )
+      {
+        localBins[blockSize*k+tid] += localBins[blockSize*k+tid+offset];
+      }
+    }
+
+    // synchronize after each tree reduction step
+    __syncthreads();
+  }
+
+  // at this point, the bin counts for the entire block are in
+  // the first numBins entries of localBins
+  // now write those bins to global memory
+  if ( tid < numBins )
+  {
+    bins[bid*numBins+tid] = localBins[tid*blockSize];
+  }
+}
+\end{lstlisting}
+
 
 \section{Java Visualization}\label{visualization}
 
