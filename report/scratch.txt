@@ -1,5 +1,18 @@
 While Glimpse supports basic visual effects using OpenGL shaders, more complicated data analysis is better suited for NVIDIA's Compute Unified Device Architecture\cite{cuda-zone} which exposes GPU hardware for general purpose computation.
 
+
+\section{Glimpse}\label{glimpse}
+
+For example, Glimpse uses OpenGL Shader Language (GLSL) to dynamically adjust the color scale of 2D heat map plots like Figure \ref{heatmap}. The underlying data for both the heat map and color scale are stored in OpenGL textures, which allows utilization of the GPU texture cache to speed data lookups. Fortuitously, this also means that texture data displayed by Glimpse is already in video memory and accessible to CUDA kernels like the histogram calculation kernels developed for this project.
+
+
+\begin{figure}
+\centering
+\includegraphics[width=1.0\textwidth]{screenshots/glimpse/TaggedHeatMapExample.png}
+\caption{Glimpse Heat Map Visualization\cite{glimpse.com}}
+\label{heatmap}
+\end{figure}
+
         // once offset is under 32 (and thus all threads involved in the
         // reduction fit within a single warp) the __syncthreads()
         // calls are no longer necessary and we can save time by manually

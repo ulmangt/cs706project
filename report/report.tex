@@ -18,7 +18,9 @@
 
 \section{Abstract}\label{abstract}
 
-This project uses NVIDIA's Compute Unified Device Architecture\cite{cuda-zone} (CUDA) to calculate histograms for subsections of a large heat map in real time and displays the results using Glimpse visualization tools (see Section \ref{glimpse}). Profiling and optimizing CUDA applications is difficult because computations are run on hundreds of cores simultaneously. Determining and fixing performance bottlenecks is complicated by multiple interdependent concerns including: fitting kernel register and shared memory usage into available hardware, significant differences in efficient memory access patterns for different memory spaces (global, constant, and shared memory), managing synchronization of hundreds of GPU threads, and generally tight coupling of low-level hardware considerations to algorithm design. Thus, this project also discusses utilization of NVIDIA's Visual Profiler\cite{nvidia-visual-profiler}.
+Glimpse (\url{http://metsci.github.com/glimpse/}) is a Java library for building 2D data visualization applications which take advantage of GPU hardware, allowing users to rapidly explore large data sets\footnote{I have developed Glimpse as part of my professional work over the past year. The development of the graphics library itself is not part of the scope of this project, only the development, profiling, and debugging of the CUDA histogram calculation kernel and the use of Glimpse to visualize the results. Glimpse is released under the open source BSD license.}. Glimpse uses GPU shaders to dynamically color large heat map plots like Figure \ref{histogram1}. However, more complicated data analysis and visualization is better suited for NVIDIA's Compute Unified Device Architecture\cite{cuda-zone} (CUDA) which exposes GPU hardware for general purpose computation.
+
+This project uses CUDA to calculate histograms for subsections of a large heat map in real time and displays the results using Glimpse visualization tools. Profiling and optimizing CUDA applications is difficult because computations are run on hundreds of cores simultaneously. Determining and fixing performance bottlenecks is complicated by multiple interdependent concerns including: fitting kernel register and shared memory usage into available hardware, significant differences in efficient memory access patterns for different memory spaces (global, constant, and shared memory), managing synchronization of hundreds of GPU threads, and generally tight coupling of low-level hardware considerations to algorithm design. Thus, this project also discusses utilization of NVIDIA's Visual Profiler\cite{nvidia-visual-profiler}.
 
 The input data to the histogram calculation is a matrix of floating point data values. The output is an array of integers containing the number of matrix values which fall within a set of discrete bins. The matrix data is stored in video memory on graphics card as a two dimensional OpenGL texture. This allows the CUDA histogram calculation kernel to take advantage of specialized caching hardware on the graphics card to speed data access. Figure \ref{histogram1} shows the final Java application and Section \ref{visualization} provides a link to a video of the histogram dynamically adjusting in response to user input.
 
@@ -27,17 +29,6 @@ The input data to the histogram calculation is a matrix of floating point data v
 \includegraphics[width=1.0\textwidth]{screenshots/glimpse/GlimpseHistogramPlot.png}
 \caption{Glimpse Histogram Visualization}
 \label{histogram1}
-\end{figure}
-
-\section{Glimpse}\label{glimpse}
-
-Glimpse (\url{http://metsci.github.com/glimpse/}) is a Java library for building 2D data visualization applications which take advantage of GPU hardware, allowing users to rapidly explore large data sets\footnote{I have developed Glimpse as part of my professional work over the past year. The development of the graphics library itself is not part of the scope of this project, only the development, profiling, and debugging of the CUDA histogram calculation kernel and the use of Glimpse to visualize the results. Glimpse is released under the open source BSD license.}. For example, Glimpse uses OpenGL Shader Language (GLSL) to dynamically adjust the color scale of 2D heat map plots like Figure \ref{heatmap}. The underlying data for both the heat map and color scale are stored in OpenGL textures, which allows utilization of the GPU texture cache to speed data lookups. Fortuitously, this also means that texture data displayed by Glimpse is already in video memory and accessible to CUDA kernels like the histogram calculation kernels developed for this project.
-
-\begin{figure}
-\centering
-\includegraphics[width=1.0\textwidth]{screenshots/glimpse/TaggedHeatMapExample.png}
-\caption{Glimpse Heat Map Visualization\cite{glimpse.com}}
-\label{heatmap}
 \end{figure}
 
 \section{Single Threaded Baseline}\label{baseline}
@@ -322,11 +313,11 @@ extern "C" __global__ void calculateHistogram3(
 \label{kernel3nvvp4}
 \end{figure}
 
-The NVVP results in Figure \ref{kernel3nvvp3} and Figure \ref{kernel3nvvp4} indicate that this is the fastest approach, taking 584$\mu$s for a 1000 by 1000 pixel element matrix. The main bottlenecks appear to be poor global memory access patterns and low utilization of available multiprocessors (reported as 18.2\% achieved occupancy in the kernel details in Figure \ref{kernel3nvvp4}). Occupany is defined as the total number of active warps divided by the maximum active warps (which is determined by the number of GPU multiprocessors). Both shared memory and thread registers are limited resources which must be shared among all warps in a block. If individual threads use too many registers or too much shared memory, then processors will sit idle\ref{occupancy}.
+The NVVP results in Figure \ref{kernel3nvvp3} and Figure \ref{kernel3nvvp4} indicate that this is the fastest approach, taking 584$\mu$s for a 1000 by 1000 pixel element matrix. The main bottlenecks appear to be poor global memory access patterns and low utilization of available multiprocessors (reported as 18.2\% achieved occupancy in the kernel details in Figure \ref{kernel3nvvp4}). Occupancy is defined as the total number of active warps divided by the maximum active warps (which is determined by the number of GPU multiprocessors). Both shared memory and thread registers are limited resources which must be shared among all warps in a block. If individual threads use too many registers or too much shared memory, then processors will sit idle\cite{occupancy}.
 
-In the case of Listing \ref{kernel3}, NVVP reports in Figure \ref{kernel3nvvp4} that register usage is the limiting factor. Unintuitively, in such cases it can often be faster to recalculate a value every time it is needed rather than calculate the value once and store it in a register. A number of adjustments to Listing \ref{kernel3} along those lines were tried, but none had a significant impact on occupancy or overall runtime. Register usage is also affected by compiler loop unrolling, which can be controlled by \emph{#pragma unroll} directives in the source. However, these also had no impact on occupancy or runtime.
+In the case of Listing \ref{kernel3}, NVVP reports in Figure \ref{kernel3nvvp4} that register usage is the limiting factor. Unintuitively, in such cases it can often be faster to recalculate a value every time it is needed rather than calculate the value once and store it in a register. A number of adjustments to Listing \ref{kernel3} along those lines were tried, but none had a significant impact on occupancy or overall runtime. Register usage is also affected by compiler loop unrolling, which can be controlled by \emph{\#pragma unroll} directives in the source. However, these also had no impact on occupancy or runtime.
 
-Despite the occupancy issues, \emph{calculateHistogram3} performed significantly better than both other kernels for matrices above 600 pixels per side. Figure \ref{comparison1} provides a comparison of runtimes for all three kernels (and the single threaded baseline) for a variety of matrix sizes.
+Despite the occupancy issues, \emph{calculateHistogram3} performed significantly better than both other kernels for matrices above 600 pixels per side. Figure \ref{comparison1} provides a runtime comparison for all three kernels (and the single threaded baseline) over a variety of matrix sizes.
 
 \begin{figure}
 \centering
